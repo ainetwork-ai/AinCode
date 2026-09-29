@@ -10,7 +10,7 @@ agents they created and the agents of organizations they may edit.
 The workspace root is `/home/aincode/agents` (a git repository). Each agent is one folder:
 
 ```
-<id>/agent.json    name, description, model, mode, allowedHosts, secretNames, skills, media, a2ui (and org/visibility)
+<id>/agent.json    name, description, model, mode, allowedHosts, secretNames, skills, media, a2ui (and visibility, orgId)
 <id>/prompt.md     the system prompt
 <id>/files/        code, for `tools` and `handler` agents; files/index.mjs is the entry point
 <id>/.ainize.json  the version last pulled or pushed; do not edit
@@ -22,8 +22,10 @@ Run these in the terminal or through the shell tool:
 
 - `ainize-agents list`: the agents this person can manage, and which of them are pulled here.
 - `ainize-agents pull <id>` or `ainize-agents pull --all`: fetches agents into folders. Pull before editing.
-- `ainize-agents new <id> --mode prompt|tools|handler [--name "Name"] [--org <org>]`: scaffolds a new agent
-  locally. It is not on ainize until you push it.
+- `ainize-agents new <id> --mode prompt|tools|handler [--name "Name"] [--org <org id>]`: scaffolds a new agent
+  locally. It is not on ainize until you push it. It is `private` by default; with `--org` it is shared with that
+  AIN organization (`visibility: "org"`, `orgId`), and every member of it may then change it. Only its creator may
+  delete it or change `visibility`/`orgId`.
 - `ainize-agents push <id>`: creates the agent on ainize or updates it. This is what deploys a change. It refuses to
   push if someone else changed the agent since the pull; in that case pull again and merge (your edits are in git).
 - `ainize-agents logs <id>`: shows recent runtime output of a code agent.

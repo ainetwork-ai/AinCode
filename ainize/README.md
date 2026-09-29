@@ -93,9 +93,10 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## Known gaps
 
-- **Organizations.** Today's node lets only an agent's creator change it. Hosted agents also need a wallet session,
-  so AIN SSO and Google users can read their workspace but cannot yet create hosted agents. The CLI already asks for
-  `?manageable=1` and sends `org`/`visibility`; organization editing arrives when the node supports it.
+- **Organizations.** The node (ainize-node #40, #41) lets wallet and AIN SSO sessions create hosted agents, and
+  members of an AIN organization change the agents shared with it (`visibility: "org"`, `orgId`); only the creator
+  deletes or re-shares. `ainize-agents list` uses `?manageable=1`. Google-only sessions are not yet agent owners on
+  the node.
 - **Signing in from the landing page.** The sign-in page's wallet and Google routes return with an in-app
   navigation, which can land on the site's own 404 for `/code/` until the page is reloaded. "Sign in with AIN" is a
   full redirect and returns to `/code/` directly.
