@@ -47,7 +47,7 @@ export function createApiForServer(input: {
 }): OpenCodeClient {
   return OpenCode.make({
     baseUrl: input.server.url,
-    fetch: input.fetch,
+    fetch: keepBasePath(input.server.url, input.fetch),
     headers: input.server.password
       ? {
           Authorization: `Basic ${authTokenFromCredentials({
@@ -57,6 +57,25 @@ export function createApiForServer(input: {
         }
       : undefined,
   })
+}
+
+/**
+ * The vendored client resolves absolute request paths against `baseUrl`, which drops a path prefix
+ * such as `/code` (OPENCODE_BASE_PATH). Re-apply the prefix to same-origin requests that lost it.
+ */
+export function keepBasePath(baseUrl: string, fetch?: typeof globalThis.fetch): typeof globalThis.fetch | undefined {
+  const base = URL.canParse(baseUrl) ? new URL(baseUrl) : undefined
+  const prefix = base?.pathname.replace(/\/+$/, "") ?? ""
+  if (!base || !prefix) return fetch
+  const next = fetch ?? globalThis.fetch
+  const prefixed = (input: RequestInfo | URL, init?: RequestInit) => {
+    if (input instanceof Request) return next(input, init)
+    const url = new URL(input)
+    if (url.origin !== base.origin || url.pathname === prefix || url.pathname.startsWith(`${prefix}/`)) return next(input, init)
+    url.pathname = prefix + url.pathname
+    return next(url, init)
+  }
+  return Object.assign(prefixed, { preconnect: next.preconnect })
 }
 
 export type ServerApi = OpenCodeClient

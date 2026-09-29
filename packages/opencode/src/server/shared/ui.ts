@@ -3,6 +3,7 @@ import { Effect, Stream } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { createHash } from "node:crypto"
 import { ProxyUtil } from "../proxy-util"
+import { BasePath } from "./base-path"
 
 let embeddedUIPromise: Promise<Record<string, string> | null> | undefined
 
@@ -56,7 +57,9 @@ function embeddedUIResponse(file: string, body: Uint8Array) {
   const mime = FSUtil.mimeType(file)
   const headers = new Headers({ "content-type": mime })
   if (mime.startsWith("text/html")) {
-    headers.set("content-security-policy", cspForHtml(new TextDecoder().decode(body)))
+    const html = BasePath.rewriteHtml(new TextDecoder().decode(body), BasePath.current())
+    headers.set("content-security-policy", cspForHtml(html))
+    return HttpServerResponse.raw(new TextEncoder().encode(html), { headers })
   }
   return HttpServerResponse.raw(body, { headers })
 }
@@ -94,7 +97,7 @@ export function serveUIEffect(
     const headers = proxyResponseHeaders(response.headers)
 
     if (response.headers["content-type"]?.includes("text/html")) {
-      const body = yield* response.text
+      const body = BasePath.rewriteHtml(yield* response.text, BasePath.current())
       headers.set("Content-Security-Policy", cspForHtml(body))
       return HttpServerResponse.text(body, { status: response.status, headers })
     }

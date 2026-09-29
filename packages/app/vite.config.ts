@@ -20,6 +20,8 @@ const sentry =
     : false
 
 export default defineConfig({
+  // Relative so one build can be served from any path prefix; index.html's <base href> anchors it.
+  base: "./",
   plugins: [desktopPlugin, sentry] as any,
   server: {
     host: "0.0.0.0",
