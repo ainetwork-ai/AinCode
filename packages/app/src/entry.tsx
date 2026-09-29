@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/solid"
 import { render } from "solid-js/web"
+import { Router } from "@solidjs/router"
 import { AppBaseProviders, AppInterface } from "@/app"
 import { loadInitialLocale } from "@/context/language"
 import { type Platform, PlatformProvider } from "@/context/platform"
@@ -9,6 +10,7 @@ import { createBrowserDraftStore } from "@/utils/draft-store"
 import { dict as en } from "@/i18n/en"
 import { dict as zh } from "@/i18n/zh"
 import { authFromToken } from "@/utils/server"
+import { basePath } from "@/utils/base-path"
 import pkg from "../package.json"
 import { ServerConnection } from "./context/server"
 
@@ -100,7 +102,7 @@ const getCurrentUrl = () => {
   if (location.hostname.includes("opencode.ai")) return "http://localhost:4096"
   if (import.meta.env.DEV)
     return `http://${import.meta.env.VITE_OPENCODE_SERVER_HOST ?? "localhost"}:${import.meta.env.VITE_OPENCODE_SERVER_PORT ?? "4096"}`
-  return location.origin
+  return location.origin + basePath()
 }
 
 const getDefaultUrl = () => {
@@ -169,6 +171,7 @@ if (root instanceof HTMLElement) {
               defaultServer={ServerConnection.Key.make(getDefaultUrl())}
               canonicalLocalServer={ServerConnection.key(server)}
               servers={[server]}
+              router={(routerProps) => <Router {...routerProps} base={basePath()} />}
               disableHealthCheck
             />
           </AppBaseProviders>
