@@ -34,6 +34,14 @@ server.listen(cfg.port, cfg.host, () => {
   )
 })
 
+// `kill -USR2 <pid>` prints what the gateway believes about each workspace.
+process.on("SIGUSR2", () => {
+  for (const sb of boxes.list()) {
+    const idle = Math.round((Date.now() - sb.lastActive) / 1000)
+    console.log(`[status] ${sb.name} running=${sb.running} open=${sb.open} idle=${idle}s principal=${sb.principal}`)
+  }
+})
+
 // Workspaces keep running across a gateway restart; the next gateway picks them up in boot().
 for (const sig of ["SIGTERM", "SIGINT"] as const) {
   process.on(sig, () => {

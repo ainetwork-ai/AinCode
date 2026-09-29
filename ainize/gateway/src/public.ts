@@ -157,9 +157,15 @@ export class PublicProxy {
         up.on("error", () => res.destroy())
       },
     )
+    let counted = true
     const done = () => {
+      if (!counted) return
+      counted = false
       sb.open = Math.max(0, sb.open - 1)
       this.boxes.touch(sb)
+      // The browser went away (or the response finished): end the inner request too, or an event stream would
+      // keep running — and the workspace would never look idle.
+      if (!upstream.destroyed) upstream.destroy()
     }
     res.once("close", done)
     upstream.on("error", async (e: any) => {
@@ -168,7 +174,8 @@ export class PublicProxy {
       await this.boxes.recheck(sb)
       if (!retried && !sb.running && ["ENOENT", "ECONNREFUSED"].includes(e.code) && (req.method === "GET" || req.method === "HEAD")) {
         res.removeListener("close", done)
-        done()
+        counted = false
+        sb.open = Math.max(0, sb.open - 1)
         try {
           await this.boxes.ensure(sb.principal)
           return this.forward(sb, req, res, true)

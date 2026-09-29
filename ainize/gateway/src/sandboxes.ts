@@ -99,6 +99,10 @@ export class Sandboxes {
     if (this.sweeper) clearInterval(this.sweeper)
   }
 
+  list(): Sandbox[] {
+    return [...this.all.values()]
+  }
+
   get(principal: string): Sandbox | undefined {
     return this.all.get(principalHash(principal))
   }
