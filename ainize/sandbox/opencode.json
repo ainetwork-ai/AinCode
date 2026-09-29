@@ -1,0 +1,28 @@
+{
+  "autoupdate": false,
+  "share": "disabled",
+  "lsp": false,
+  "formatter": false,
+  "enabled_providers": ["ainize"],
+  "model": "ainize/Qwen3.8-Flash-Next",
+  "small_model": "ainize/Qwen3.8-Flash-Next",
+  "instructions": ["/opt/aincode/AGENTS.md"],
+  "provider": {
+    "ainize": {
+      "name": "Ainize",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:4097/v1",
+        "apiKey": "held-by-the-gateway"
+      },
+      "models": {
+        "Qwen3.8-Flash-Next": {
+          "name": "Qwen3.8 Flash Next",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 262144, "output": 32768 }
+        }
+      }
+    }
+  }
+}

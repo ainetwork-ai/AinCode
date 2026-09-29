@@ -1,0 +1,29 @@
+# systemd USER unit for the ainize.ai/code gateway. Not installed by anything; see ainize/README.md.
+#
+#   cp ainize/deploy/aincode-gateway.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now aincode-gateway
+[Unit]
+Description=AinCode workspaces for ainize.ai/code
+After=network-online.target docker.service ainize-web.service
+
+[Service]
+Type=simple
+# The checkout this runs from. Node >= 23.6 runs the TypeScript sources directly.
+WorkingDirectory=%h/aincode-gateway/current/ainize/gateway
+ExecStart=/home/comcom/.local/node/bin/node src/main.ts
+Environment=AINCODE_GATEWAY_HOST=127.0.0.1
+Environment=AINCODE_GATEWAY_PORT=3950
+Environment=AINCODE_BASE_PATH=/code
+Environment=AINIZE_WEB_URL=http://127.0.0.1:3900
+Environment=AINCODE_STATE_DIR=%h/.aincode-gateway
+Environment=AINCODE_IMAGE=aincode-sandbox:latest
+Environment=AINCODE_IDLE_MS=1800000
+Environment=AINCODE_MAX_RUNNING=10
+Environment=AINCODE_MEMORY=2g
+Environment=AINCODE_CPUS=2
+Environment=AINCODE_MODELS=Qwen3.8-Flash-Next
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
