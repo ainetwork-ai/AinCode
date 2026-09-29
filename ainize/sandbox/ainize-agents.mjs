@@ -20,6 +20,7 @@ const DEFAULT_MODEL = "Qwen3.8-Flash-Next"
 const SERVER_FIELDS = new Set([
   "owner", "version", "createdAt", "updatedAt", "created_at", "updated_at", "files", "systemPrompt",
   "status", "error", "live_version", "a2a_url", "card_url", "secrets", "kind", "url",
+  "org_id", "updated_by", "updatedBy", "can_manage", "can_delete",
 ])
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/
 
@@ -66,10 +67,12 @@ function listOf(data) {
 }
 
 async function remoteList() {
-  // `mine=1` alone is "created by me" on every node. `manageable=1` asks a node that knows organizations to add the
-  // agents of organizations I may edit; a node that does not know it ignores it and still answers `mine`.
-  const data = await api("GET", "/hosted-agents?mine=1&manageable=1")
-  return { scope: data?.scope ?? "mine", agents: listOf(data) }
+  // `manageable=1` is my agents plus those shared (visibility "org") with an organization I belong to; its rows carry
+  // `can_manage`. A node that predates it ignores the parameter and answers its public list instead, so rows without
+  // `can_manage` mean "ask for mine=1" — "created by me", which every node knows.
+  const managed = listOf(await api("GET", "/hosted-agents?manageable=1"))
+  if (managed.length && managed.every((a) => "can_manage" in a)) return { scope: "yours and your organizations'", agents: managed }
+  return { scope: "yours", agents: listOf(await api("GET", "/hosted-agents?mine=1")) }
 }
 
 async function remoteGet(id) {
@@ -87,6 +90,10 @@ function writeLocal(spec) {
   mkdirSync(dir, { recursive: true })
   const meta = {}
   for (const [k, v] of Object.entries(spec)) if (!SERVER_FIELDS.has(k)) meta[k] = v
+  // The node answers `org_id`; it takes `orgId` back. Only an `org` agent has one.
+  const orgId = spec.orgId ?? spec.org_id ?? null
+  if (meta.visibility === "org" && orgId) meta.orgId = orgId
+  else delete meta.orgId
   writeJson(join(dir, "agent.json"), meta)
   writeFileSync(join(dir, "prompt.md"), spec.systemPrompt ?? "")
   rmSync(join(dir, "files"), { recursive: true, force: true })
@@ -108,6 +115,9 @@ function readLocal(id) {
   if (!existsSync(join(dir, "agent.json"))) throw new Error(`no agent at ${dir} (run: ainize-agents pull ${id}, or new ${id})`)
   const meta = readJson(join(dir, "agent.json"))
   if (meta.id !== id) throw new Error(`agent.json says id "${meta.id}" but the folder is "${id}"`)
+  // An agent.json written before the node's sharing fields: `org` meant "share with this organization".
+  if (meta.org && !meta.orgId) Object.assign(meta, { visibility: "org", orgId: meta.org })
+  delete meta.org
   const files = {}
   const base = join(dir, "files")
   for (const p of walk(base)) files[relative(base, p).split(sep).join("/")] = readFileSync(p, "utf8")
@@ -141,9 +151,11 @@ const commands = {
     for (const a of agents) {
       seen.add(a.id)
       const where = local.includes(a.id) ? "pulled" : "remote only"
-      const org = a.org ? ` org=${a.org}` : ""
+      const orgId = a.org_id ?? a.orgId
+      const org = orgId ? ` org=${orgId}` : ""
       const vis = a.visibility ? ` ${a.visibility}` : ""
-      console.log(`${a.id}\t${a.mode ?? "prompt"}\tv${a.version ?? "?"}${org}${vis}\t${where}\t${a.name ?? ""}`)
+      const mineFlag = a.can_delete === false ? " (organization's)" : ""
+      console.log(`${a.id}\t${a.mode ?? "prompt"}\tv${a.version ?? "?"}${org}${vis}${mineFlag}\t${where}\t${a.name ?? ""}`)
     }
     for (const id of local) if (!seen.has(id)) console.log(`${id}\t-\t-\tlocal only (not on ainize yet: ainize-agents push ${id})`)
   },
@@ -216,8 +228,12 @@ const commands = {
       media: { transcription: false, image: false },
       skills: [],
     }
+    // Shared with an organization: its members may then change it too (only you may remove it or change this).
     const org = flag(args, "--org")
-    if (org) Object.assign(meta, { org, visibility: flag(args, "--visibility") ?? "private" })
+    const visibility = flag(args, "--visibility") ?? (org ? "org" : "private")
+    if (!["public", "org", "private", "unlisted"].includes(visibility)) throw new Error("--visibility is public, org, private or unlisted")
+    if (visibility === "org" && !org) throw new Error("--visibility org needs --org <organization id>")
+    Object.assign(meta, { visibility, ...(visibility === "org" ? { orgId: org } : {}) })
     mkdirSync(dirOf(id), { recursive: true })
     writeJson(join(dirOf(id), "agent.json"), meta)
     writeFileSync(join(dirOf(id), "prompt.md"), `You are ${meta.name}. Answer helpfully and concisely.\n`)
@@ -275,7 +291,7 @@ if (!cmd || !commands[cmd]) {
   list                         agents you can manage, and which are pulled here
   pull <id...> | --all         fetch into ${ROOT}/<id>
   push <id> [--force]          create or update on ainize from the folder
-  new <id> [--mode prompt|tools|handler] [--name N] [--org ORG [--visibility public|private]]
+  new <id> [--mode prompt|tools|handler] [--name N] [--org ORG] [--visibility public|org|private|unlisted]
   logs <id>                    recent runtime logs
   secret <id> <NAME>           set a secret from stdin
   rm <id> --yes                delete on ainize
