@@ -136,6 +136,12 @@ export class PublicProxy {
         return json(res, 503, { error: "your workspace could not start" })
       }
     }
+    // A bare /code/ page load goes to a new session in the workspace. The app's home only lists projects this
+    // browser has opened before, so a first visit would otherwise show an empty page with nothing to start from.
+    if (req.method === "GET" && wantsPage(req) && url === this.cfg.basePath + "/") {
+      res.writeHead(302, { location: workspaceSessionPath(this.cfg.basePath, this.cfg.workspaceDir) })
+      return res.end()
+    }
     this.forward(sb!, req, res)
   }
 
@@ -239,4 +245,10 @@ export class PublicProxy {
     socket.on("error", close)
     socket.on("close", close)
   }
+}
+
+/** The app's new-session route for a directory: `/<base>/<base64url(dir)>/session`, as the web app encodes it. */
+export function workspaceSessionPath(basePath: string, dir: string) {
+  const b64 = Buffer.from(dir, "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+  return `${basePath}/${b64}/session`
 }

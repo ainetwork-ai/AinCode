@@ -39,6 +39,7 @@ import type { PromptSession } from "@/context/prompt"
 import "./titlebar.css"
 import { newTabTooltipKeybind } from "./command-tooltip-keybind"
 import { normalizeSessionInfo } from "@/utils/session"
+import { routePath } from "@/utils/base-path"
 
 const legacyTitlebarHeight = 40
 const v2TitlebarHeight = 36
@@ -97,13 +98,13 @@ export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visibl
     action: undefined as "back" | "forward" | undefined,
   })
 
-  const path = () => `${location.pathname}${location.search}${location.hash}`
+  const path = () => `${routePath(location.pathname)}${location.search}${location.hash}`
   const creating = createMemo(() => {
     const route = layout.route()
     if (route.type === "draft" || route.type === "dir-new-sesssion") return true
     if (!params.dir) return false
     if (params.id) return false
-    const parts = location.pathname.replace(/\/+$/, "").split("/")
+    const parts = routePath(location.pathname).replace(/\/+$/, "").split("/")
     return parts.at(-1) === "session"
   })
 

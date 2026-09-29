@@ -2,6 +2,7 @@ import type { UserMessage } from "@opencode-ai/sdk/v2"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { createEffect, createMemo, onCleanup, onMount } from "solid-js"
 import { messageIdFromHash } from "./message-id-from-hash"
+import { routePath } from "@/utils/base-path"
 
 export const useSessionHashScroll = (input: {
   sessionKey: () => string
@@ -49,14 +50,14 @@ export const useSessionHashScroll = (input: {
     if (input.pendingMessage()) input.setPendingMessage(undefined)
     if (!location.hash) return
     clearing = true
-    navigate(location.pathname + location.search, { replace: true })
+    navigate(routePath(location.pathname) + location.search, { replace: true })
   }
 
   const updateHash = (id: string) => {
     const hash = `#${input.anchor(id)}`
     if (location.hash === hash) return
     clearing = false
-    navigate(location.pathname + location.search + hash, {
+    navigate(routePath(location.pathname) + location.search + hash, {
       replace: true,
     })
   }

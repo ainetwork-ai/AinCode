@@ -13,6 +13,7 @@ import { createTabMemory } from "./tab-memory"
 import { nextTabAfterClose, pushClosedTab, removeClosedTabs, takeClosedTab, type ClosedTab } from "./closed-tabs"
 import { createDraftPromptSession, type PromptModel } from "./prompt-state"
 import { migrateTabs } from "./tab-migration"
+import { routePath } from "@/utils/base-path"
 
 export type SessionTab = {
   type: "session"
@@ -157,7 +158,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       if (!tab) return
       const key = tabKey(tab)
       const draftID = tab.type === "draft" ? tab.draftID : undefined
-      const nextTab = nextTabAfterClose(store, index, recentKey() === key && location.pathname !== "/")
+      const nextTab = nextTabAfterClose(store, index, recentKey() === key && routePath(location.pathname) !== "/")
       closing.add(key)
       void startTransition(() => {
         setStore(
@@ -231,7 +232,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       promoteDraft(draftID: string, session: Omit<SessionTab, "type">) {
         // Keep the replacement and navigation atomic so /new-session never renders
         // after its backing draft tab has been removed from the store.
-        const active = location.pathname === "/new-session" && location.query.draftId === draftID
+        const active = routePath(location.pathname) === "/new-session" && location.query.draftId === draftID
         const next = { type: "session" as const, ...session }
         void startTransition(() => {
           setStore(

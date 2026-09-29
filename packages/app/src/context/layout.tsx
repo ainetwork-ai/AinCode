@@ -21,6 +21,7 @@ import { createSessionKeyReader, ensureSessionKey, pruneSessionKeys } from "./la
 import { requireServerKey } from "@/utils/session-route"
 import { type DraftTab, useTabs } from "./tabs"
 import { closeSessionTab, openSessionTab, previewSessionTab, type SessionTabs } from "./layout-tabs"
+import { routePath } from "@/utils/base-path"
 
 export { createSessionKeyReader, ensureSessionKey, pruneSessionKeys }
 
@@ -167,7 +168,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     const platform = usePlatform()
     const location = useLocation()
     const route = createMemo(() => {
-      const value = currentRoute(location.pathname, location.search)
+      const value = currentRoute(routePath(location.pathname), location.search)
       if (value.type === "home") return value
       if (value.server) return value
       if (value.type === "draft") {

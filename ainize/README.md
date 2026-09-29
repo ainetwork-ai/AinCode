@@ -68,6 +68,7 @@ gateway egress ─▶ ainize web 127.0.0.1:3900 ─▶ node
 | `AINCODE_MEMORY` / `_CPUS` / `_PIDS` | `2g` / `2` / `512` | per workspace |
 | `AINCODE_MODELS` | `Qwen3.8-Flash-Next` | comma-separated |
 | `AINCODE_DOCKER_RUNTIME` | *(docker default)* | e.g. `runsc` |
+| `AINCODE_INSTANCE` | *(empty)* | namespace for a second gateway on the same host (staging/tests): its containers, volumes and label carry the name, so it never adopts or stops the production workspaces |
 
 - **Tests:** `cd ainize/gateway && node --test test/*.test.ts`.
 - **Updating the image:** run `ainize/sandbox/build.sh --rebuild-binary`, then remove the old containers with

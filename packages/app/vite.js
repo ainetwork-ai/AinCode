@@ -6,6 +6,10 @@ import { fileURLToPath } from "url"
 const theme = fileURLToPath(new URL("./public/oc-theme-preload.js", import.meta.url))
 
 const channel = (() => {
+  // OPENCODE_APP_CHANNEL lets a build pick the web app's channel apart from the binary's (whose name also keys
+  // the database file), e.g. a custom-channel binary that should still ship the release UI.
+  const app = process.env.OPENCODE_APP_CHANNEL
+  if (app === "dev" || app === "beta" || app === "prod") return app
   const raw = process.env.OPENCODE_CHANNEL
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
   if (process.env.OPENCODE_CHANNEL === "latest") return "prod"

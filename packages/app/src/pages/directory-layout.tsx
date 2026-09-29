@@ -12,6 +12,7 @@ import { Schema } from "effect"
 import type { ServerConnection } from "@/context/server"
 import { sessionHref } from "@/utils/session-route"
 import { useServerSync } from "@/context/server-sync"
+import { routePath } from "@/utils/base-path"
 
 export function DirectoryDataProvider(
   props: ParentProps<{
@@ -38,7 +39,7 @@ export function DirectoryDataProvider(
     if (props.draftID || props.server?.()) return
     const next = sync().data.path.directory
     if (!next || next === directory()) return
-    const path = location.pathname.slice(slug().length + 1)
+    const path = routePath(location.pathname).slice(slug().length + 1)
     navigate(`/${base64Encode(next)}${path}${location.search}${location.hash}`, { replace: true })
   })
 
