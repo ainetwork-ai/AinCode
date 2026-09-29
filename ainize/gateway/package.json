@@ -1,0 +1,12 @@
+{
+  "name": "@ainize/aincode-gateway",
+  "private": true,
+  "type": "module",
+  "description": "ainize.ai/code: one sandboxed AinCode workspace per signed-in ainize user",
+  "engines": { "node": ">=23.6" },
+  "scripts": {
+    "start": "node src/main.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p ."
+  }
+}
