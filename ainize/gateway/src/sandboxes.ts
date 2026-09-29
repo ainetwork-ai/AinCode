@@ -18,7 +18,7 @@ import { docker, dockerOk } from "./docker.ts"
 import { principalHash } from "./identity.ts"
 
 export const SANDBOX_USER = "aincode"
-const LABEL = "ainize.aincode"
+const BASE_LABEL = "ainize.aincode"
 
 export interface Sandbox {
   hash: string
@@ -40,6 +40,14 @@ export class Sandboxes {
   private all = new Map<string, Sandbox>()
   private starting = new Map<string, Promise<Sandbox>>()
   private sweeper: NodeJS.Timeout | undefined
+
+  /** Docker label, container-name and volume-name prefix — namespaced by `cfg.instance`. */
+  private get label() {
+    return this.cfg.instance ? `${BASE_LABEL}.${this.cfg.instance}` : BASE_LABEL
+  }
+  private get prefix() {
+    return this.cfg.instance ? `aincode-${this.cfg.instance}-` : "aincode-"
+  }
 
   /** `beforeStart` makes sure out.sock is listening before the container can try to use it. */
   constructor(cfg: GatewayConfig, beforeStart: (sb: Sandbox) => Promise<void>) {
@@ -66,7 +74,7 @@ export class Sandboxes {
     sb = {
       hash,
       principal,
-      name: `aincode-${hash}`,
+      name: `${this.prefix}${hash}`,
       runDir,
       inSock: join(runDir, "in.sock"),
       outSock: join(runDir, "out.sock"),
@@ -83,7 +91,7 @@ export class Sandboxes {
   async boot() {
     for (const d of ["run", "secrets"]) mkdirSync(join(this.cfg.stateDir, d), { recursive: true, mode: 0o700 })
     chmodSync(this.cfg.stateDir, 0o700)
-    const out = await dockerOk(["ps", "-a", "--filter", `label=${LABEL}=1`, "--format", `{{.Names}}\t{{.State}}\t{{.Label "${LABEL}.principal"}}`])
+    const out = await dockerOk(["ps", "-a", "--filter", `label=${this.label}=1`, "--format", `{{.Names}}\t{{.State}}\t{{.Label "${this.label}.principal"}}`])
     for (const line of out.split("\n").filter(Boolean)) {
       const [, state, principal] = line.split("\t")
       if (!principal) continue
@@ -163,8 +171,8 @@ export class Sandboxes {
       "run", "-d",
       "--name", sb.name,
       "--hostname", "aincode",
-      "--label", `${LABEL}=1`,
-      "--label", `${LABEL}.principal=${sb.principal}`,
+      "--label", `${this.label}=1`,
+      "--label", `${this.label}.principal=${sb.principal}`,
       "--network", "none",
       "--init",
       "--cap-drop", "ALL",
@@ -176,7 +184,7 @@ export class Sandboxes {
       "--memory-swap", c.memory,
       "--cpus", c.cpus,
       "--user", "1000:1000",
-      "-v", `aincode-home-${sb.hash}:/home/aincode`,
+      "-v", `${this.prefix}home-${sb.hash}:/home/aincode`,
       "-v", `${sb.runDir}:/run/aincode`,
       "-e", `OPENCODE_SERVER_USERNAME=${SANDBOX_USER}`,
       "-e", `OPENCODE_SERVER_PASSWORD=${sb.password}`,

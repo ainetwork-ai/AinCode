@@ -4,7 +4,7 @@ import type { IncomingMessage } from "node:http"
 import { loadConfig } from "../src/config.ts"
 import { apiAllowed } from "../src/egress.ts"
 import { ainizeCookies, IdentityResolver, principalHash, withoutAinizeCookies } from "../src/identity.ts"
-import { inboundHeaders, sameOrigin } from "../src/public.ts"
+import { inboundHeaders, sameOrigin, workspaceSessionPath } from "../src/public.ts"
 import { Sandboxes } from "../src/sandboxes.ts"
 
 test("ainize cookies are picked out, and never forwarded into a workspace", () => {
@@ -73,4 +73,18 @@ test("containers run with no network, no capabilities, read-only, as the unprivi
   }
   assert.ok(!/-p |--publish/.test(args), "no published ports")
   assert.ok(!args.includes("docker.sock"))
+})
+
+test("a bare /code/ opens a new session in the workspace, encoded the way the web app encodes directories", () => {
+  // base64url("/home/aincode/agents") without padding, as packages/core/src/util/encode.ts base64Encode does
+  assert.equal(workspaceSessionPath("/code", "/home/aincode/agents"), "/code/L2hvbWUvYWluY29kZS9hZ2VudHM/session")
+})
+
+test("a second gateway on the same host gets its own container, volume and label names", async () => {
+  const names = (instance: string) => {
+    const boxes = new Sandboxes({ ...loadConfig(), instance }, async () => {}) as any
+    return { label: boxes.label, prefix: boxes.prefix }
+  }
+  assert.deepEqual(names(""), { label: "ainize.aincode", prefix: "aincode-" })
+  assert.deepEqual(names("test"), { label: "ainize.aincode.test", prefix: "aincode-test-" })
 })

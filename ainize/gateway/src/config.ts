@@ -32,6 +32,13 @@ export interface GatewayConfig {
   models: string[]
   startTimeoutMs: number
   keyLabel: string
+  /**
+   * Namespace for a second gateway on the same Docker host (staging, a test run): its containers, volumes and label
+   * get the name in them, so neither gateway adopts, sweeps or reuses the other's workspaces. Empty = production.
+   */
+  instance: string
+  /** The workspace folder inside the container; a bare `/code/` page load opens a new session there. */
+  workspaceDir: string
 }
 
 export function loadConfig(): GatewayConfig {
@@ -54,5 +61,7 @@ export function loadConfig(): GatewayConfig {
       .filter(Boolean),
     startTimeoutMs: num(env.AINCODE_START_TIMEOUT_MS, 90_000),
     keyLabel: env.AINCODE_KEY_LABEL ?? "aincode",
+    workspaceDir: env.AINCODE_WORKSPACE_DIR ?? "/home/aincode/agents",
+    instance: (env.AINCODE_INSTANCE ?? "").replace(/[^a-z0-9-]/g, ""),
   }
 }
