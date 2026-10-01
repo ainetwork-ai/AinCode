@@ -9,6 +9,7 @@ import { BuilderMcp } from "./mcp.ts"
 import { mcpTools } from "../../shared/mcp.ts"
 import { BuilderDrive } from "./drive.ts"
 import { driveTools, validDrivePath } from "../../shared/drive.ts"
+import { agentInOrg } from "./workspaces.ts"
 import type { Identity } from "./identity.ts"
 
 function json(res: ServerResponse, status: number, body: unknown) {
@@ -47,7 +48,7 @@ export class AgentBuilder {
       const org = record(item)
       return typeof org.id === "string" && typeof org.name === "string" ? [{ id: org.id, name: org.name }] : []
     }) : []
-    return { owner: id.principal, directory: this.cfg.workspaceDir, models: this.cfg.models, orgs }
+    return { owner: id.principal, directory: this.cfg.workspaceDir, models: this.cfg.models, orgs: id.workspaceOrg ? orgs.filter(org => org.id === id.workspaceOrg) : orgs }
   }
   async mcpTool(req: IncomingMessage, res: ServerResponse) {
     try {
@@ -123,6 +124,7 @@ export class AgentBuilder {
       try { return json(res, 200, await this.context(id)) }
       catch { return json(res, 502, { error: "context_unavailable" }) }
     }
+    if (id.workspaceOrg) return json(res, 403, { error: "use_opencode_workspace_cli" })
     if (path.startsWith("/agents/") && req.method === "GET") {
       const agentID = path.slice("/agents/".length)
       if (!AGENT_ID.test(agentID)) return json(res, 400, { error: "invalid_id" })
@@ -219,7 +221,7 @@ export class AgentBuilder {
       if (!secrets.length) return json(res, 400, { error: "connections_missing" })
       const response = await this.upstream(`/api/hosted-agents/${match[1]}`, id)
       const agent = record(record(await response.json()).agent)
-      if (!response.ok || agent.owner !== id.principal || agent.mode !== "tools" ||
+      if (!response.ok || !(id.workspaceOrg ? agentInOrg(agent, id.workspaceOrg) : agent.owner === id.principal) || agent.mode !== "tools" ||
         Object.entries(files).some(([name, code]) => record(agent.files)[name] !== code) ||
         secrets.some((name) => !Array.isArray(agent.secretNames) || !agent.secretNames.includes(name))) return json(res, 403, { error: "not_owner" })
       // OpenCode owns index.mjs and workflow code; only the credential-bearing connector modules must match.

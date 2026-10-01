@@ -76,3 +76,13 @@ and consent belong in the session’s connections panel, never in chat.
 - After user-requested push, use `ainize-agents connect <id>` to bind saved connections. Check returned status.
 - Do not use the legacy builder create API instead of local development. Distinguish local tests from live
   MCP calls and actual host-specific A2A verification. Continue development in this same OpenCode session.
+
+## Organization workspaces
+
+When `AINCODE_ORG_ID` is set, this is the organization's shared workspace. Conversations, files and Git
+history are visible to its members; write/admin members may edit. Never copy private files or credentials
+into it. `ainize-agents new` defaults to that organization's visibility; the gateway refuses personal or
+other-organization agent access, deletion, and visibility changes out of this organization.
+An organization member explicitly connects a time-limited execution account from the workspace page.
+If execution is disconnected, ask them to open that page. Do not ask for session cookies or API keys.
+Platform connections configured here are organization-shared and are separate from personal connections.

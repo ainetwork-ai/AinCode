@@ -1,6 +1,9 @@
 import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
 
 export const dict = {
+  "agentBuilder.workspaces": "Choose workspace",
+  "agentBuilder.orgWorkspace": "Organization workspace · execution",
+  "agentBuilder.orgSharedNotice": "Conversations, files, Git history and connections in this workspace are shared with your organization.",
   "agentBuilder.startingSession": "Opening an OpenCode builder conversation…",
   "agentBuilder.sessionConnections": "Agent connections · Teams / Mem / Drive",
   "agentBuilder.sessionConnectionsIntro": "Set access here, then continue the conversation. OpenCode writes and tests your agent in the workspace. These permissions are shared by this workspace’s sessions.",

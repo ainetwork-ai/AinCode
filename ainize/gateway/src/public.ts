@@ -13,7 +13,8 @@ import type { GatewayConfig } from "./config.ts"
 import type { Sessions } from "./egress.ts"
 import { IdentityResolver, withoutAinizeCookies, type Identity } from "./identity.ts"
 import { AgentBuilder } from "./builder.ts"
-import { errorPage, signInPage, startingPage } from "./pages.ts"
+import { errorPage, signInPage, startingPage, workspacesPage, organizationPage } from "./pages.ts"
+import { canWrite, organizations, orgPrincipal, workspaceRoute, WorkspaceExecutors } from "./workspaces.ts"
 import type { Sandbox, Sandboxes } from "./sandboxes.ts"
 
 const HOP = new Set([
@@ -63,12 +64,15 @@ function json(res: ServerResponse, status: number, body: unknown) {
 
 export class PublicProxy {
   private readonly builder: AgentBuilder
+  private builders = new Map<string, AgentBuilder>()
+  private readonly executors: WorkspaceExecutors
   private readonly cfg: GatewayConfig
   private readonly ids: IdentityResolver
   private readonly boxes: Sandboxes
   private readonly sessions: Sessions
 
-  constructor(cfg: GatewayConfig, ids: IdentityResolver, boxes: Sandboxes, sessions: Sessions) {
+  constructor(cfg: GatewayConfig, ids: IdentityResolver, boxes: Sandboxes, sessions: Sessions, executors = new WorkspaceExecutors()) {
+    this.executors = executors
     this.builder = new AgentBuilder(cfg)
     this.cfg = cfg
     this.ids = ids
@@ -95,6 +99,15 @@ export class PublicProxy {
     return server
   }
 
+  private workspaceBuilder(base: string) {
+    if (base === this.cfg.basePath) return this.builder
+    const cached = this.builders.get(base)
+    if (cached) return cached
+    const builder = new AgentBuilder({ ...this.cfg, basePath: base })
+    this.builders.set(base, builder)
+    return builder
+  }
+
   private inPrefix(url: string) {
     const base = this.cfg.basePath
     return url === base || url.startsWith(base + "/") || url.startsWith(base + "?")
@@ -113,23 +126,61 @@ export class PublicProxy {
       res.writeHead(302, { location: this.cfg.basePath + "/" + url.slice(this.cfg.basePath.length) })
       return res.end()
     }
-    if (new URL(url, "http://gateway").pathname === this.cfg.basePath + "/_builder/mcp/tool") return this.builder.mcpTool(req, res)
-    if (new URL(url, "http://gateway").pathname === this.cfg.basePath + "/_builder/drive/tool") return this.builder.driveTool(req, res)
+    let route: ReturnType<typeof workspaceRoute>
+    try { route = workspaceRoute(this.cfg.basePath, url) }
+    catch { return json(res, 400, { error: "invalid_workspace" }) }
+    const path = new URL(url, "http://gateway").pathname
+    const builder = this.workspaceBuilder(route.base)
+    if (path === route.base + "/_builder/mcp/tool") return builder.mcpTool(req, res)
+    if (path === route.base + "/_builder/drive/tool") return builder.driveTool(req, res)
     if (!sameOrigin(req)) return json(res, 403, { error: "cross-origin request refused" })
     const id = await this.who(req)
     if (!id) {
       if (wantsPage(req)) return html(res, 200, signInPage(this.cfg.basePath, url))
       return json(res, 401, { error: "sign in to ainize first" })
     }
-    if (url.startsWith(this.cfg.basePath + "/_builder/")) {
-      return this.builder.handle(req, res, id)
+    if (path === this.cfg.basePath + "/_workspaces") {
+      if (req.method !== "GET") return json(res, 405, { error: "method_not_allowed" })
+      return html(res, 200, workspacesPage(this.cfg.basePath, await organizations(this.cfg.ainize, id.cookie)))
     }
-    let sb = this.boxes.get(id.principal)
+    const org = route.org ? (await organizations(this.cfg.ainize, id.cookie)).find(org => org.id === route.org) : undefined
+    if (route.org && !org) return json(res, 403, { error: "not_org_member" })
+    const principal = org ? orgPrincipal(org.id) : id.principal
+    if (org) {
+      // Disconnect already-open streams after membership/role revocation, too.
+      const writable = canWrite(org)
+      if (!writable && (req.method !== "GET" || path.startsWith(route.base + "/_builder/"))) return json(res, 403, { error: "organization_write_required" })
+      if (path === route.base + "/_workspace" && req.method === "GET") {
+        const actor = this.executors.get(org.id)
+        return html(res, 200, organizationPage(route.base, org, actor?.display, actor?.principal === id.principal))
+      }
+      if ([route.base + "/_workspace/activate", route.base + "/_workspace/release"].includes(path)) {
+        if (!writable || req.method !== "POST" || !req.headers.origin) return json(res, 403, { error: "invalid_origin_or_role" })
+        try {
+          if (path.endsWith("/activate")) this.executors.activate(org.id, id)
+          else this.executors.release(org.id, id.principal)
+        } catch { return json(res, 409, { error: "execution_account_in_use" }) }
+        res.writeHead(303, { location: route.base + "/_workspace" }); return res.end()
+      }
+      const timer = setInterval(() => {
+        void organizations(this.cfg.ainize, id.cookie).then(orgs => {
+          const current = orgs.find(item => item.id === org.id)
+          if (!current || (writable && !canWrite(current))) res.destroy()
+        }, () => res.destroy())
+      }, 15_000)
+      timer.unref()
+      res.once("close", () => clearInterval(timer))
+    }
+    if (path.startsWith(route.base + "/_builder/")) {
+      // Organization credentials and selections live under the organization, never under a visitor.
+      return builder.handle(req, res, org ? { ...id, principal, workspaceOrg: org.id } : id)
+    }
+    let sb = this.boxes.get(principal)
     if (!sb?.running) {
       if (wantsPage(req)) {
         // Start in the background and show a page that reloads itself, rather than hold the navigation open.
         let failed = false
-        const starting = this.boxes.ensure(id.principal)
+        const starting = this.boxes.ensure(principal)
         starting.catch((e) => {
           failed = true
           console.error(`[sandbox] start failed for ${id.principal}:`, e.message)
@@ -138,7 +189,7 @@ export class PublicProxy {
         if (!ready) return html(res, failed ? 503 : 200, failed ? errorPage("the workspace failed to start") : startingPage())
       }
       try {
-        sb = await this.boxes.ensure(id.principal)
+        sb = await this.boxes.ensure(principal)
       } catch (e: any) {
         console.error(`[sandbox] start failed for ${id.principal}:`, e.message)
         return json(res, 503, { error: "your workspace could not start" })
@@ -146,8 +197,8 @@ export class PublicProxy {
     }
     // A bare /code/ page load goes to a new session in the workspace. The app's home only lists projects this
     // browser has opened before, so a first visit would otherwise show an empty page with nothing to start from.
-    if (req.method === "GET" && wantsPage(req) && url === this.cfg.basePath + "/") {
-      res.writeHead(302, { location: workspaceSessionPath(this.cfg.basePath, this.cfg.workspaceDir) })
+    if (req.method === "GET" && wantsPage(req) && (url === route.base + "/" || url === route.base)) {
+      res.writeHead(302, { location: workspaceSessionPath(route.base, this.cfg.workspaceDir) })
       return res.end()
     }
     this.forward(sb!, req, res)
@@ -211,9 +262,14 @@ export class PublicProxy {
     if (!sameOrigin(req)) return refuse(403, "Forbidden")
     const id = await this.who(req)
     if (!id) return refuse(401, "Unauthorized")
+    let route: ReturnType<typeof workspaceRoute>
+    try { route = workspaceRoute(this.cfg.basePath, url) } catch { return refuse(400, "Bad Request") }
+    const org = route.org ? (await organizations(this.cfg.ainize, id.cookie)).find(item => item.id === route.org) : undefined
+    if (route.org && (!org || !canWrite(org))) return refuse(403, "Forbidden")
+    const principal = org ? orgPrincipal(org.id) : id.principal
     let sb: Sandbox
     try {
-      sb = await this.boxes.ensure(id.principal)
+      sb = await this.boxes.ensure(principal)
     } catch {
       return refuse(503, "Service Unavailable")
     }
@@ -247,6 +303,15 @@ export class PublicProxy {
       this.boxes.touch(sb)
       inner.destroy()
       socket.destroy()
+    }
+    if (org) {
+      const timer = setInterval(() => {
+        void organizations(this.cfg.ainize, id.cookie).then(orgs => {
+          if (!orgs.some(item => item.id === org.id && canWrite(item))) close()
+        }, close)
+      }, 15_000)
+      timer.unref()
+      socket.once("close", () => clearInterval(timer))
     }
     inner.on("error", close)
     inner.on("close", close)

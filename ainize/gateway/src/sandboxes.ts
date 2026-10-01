@@ -16,6 +16,7 @@ import { join } from "node:path"
 import type { GatewayConfig } from "./config.ts"
 import { docker, dockerOk } from "./docker.ts"
 import { principalHash } from "./identity.ts"
+import { workspaceBase, workspaceOrg } from "./workspaces.ts"
 
 export const SANDBOX_USER = "aincode"
 const BASE_LABEL = "ainize.aincode"
@@ -188,7 +189,8 @@ export class Sandboxes {
       "-v", `${sb.runDir}:/run/aincode`,
       "-e", `OPENCODE_SERVER_USERNAME=${SANDBOX_USER}`,
       "-e", `OPENCODE_SERVER_PASSWORD=${sb.password}`,
-      "-e", `OPENCODE_BASE_PATH=${c.basePath}`,
+      "-e", `OPENCODE_BASE_PATH=${workspaceBase(c.basePath, sb.principal)}`,
+      ...(workspaceOrg(sb.principal) ? ["-e", `AINCODE_ORG_ID=${workspaceOrg(sb.principal)}`] : []),
       ...(c.runtime ? ["--runtime", c.runtime] : []),
       c.image,
     ]
@@ -203,7 +205,7 @@ export class Sandboxes {
       const req = request(
         {
           socketPath: sb.inSock,
-          path: `${this.cfg.basePath}/global/health`,
+          path: `${workspaceBase(this.cfg.basePath, sb.principal)}/global/health`,
           headers: { authorization: this.authHeader(sb), host: "aincode" },
           timeout: 2000,
         },

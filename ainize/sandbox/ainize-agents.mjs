@@ -229,7 +229,7 @@ const commands = {
       skills: [],
     }
     // Shared with an organization: its members may then change it too (only you may remove it or change this).
-    const org = flag(args, "--org")
+    const org = flag(args, "--org") ?? process.env.AINCODE_ORG_ID
     const visibility = flag(args, "--visibility") ?? (org ? "org" : "private")
     if (!["public", "org", "private", "unlisted"].includes(visibility)) throw new Error("--visibility is public, org, private or unlisted")
     if (visibility === "org" && !org) throw new Error("--visibility org needs --org <organization id>")

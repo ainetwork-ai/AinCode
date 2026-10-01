@@ -1,4 +1,7 @@
 export const dict = {
+  "agentBuilder.workspaces": "작업 공간 선택",
+  "agentBuilder.orgWorkspace": "조직 공용 공간 · 실행 연결",
+  "agentBuilder.orgSharedNotice": "이 공간의 대화, 파일, Git 기록과 연결 설정은 같은 조직에 공유됩니다.",
   "agentBuilder.startingSession": "OpenCode Builder 대화를 여는 중…",
   "agentBuilder.sessionConnections": "에이전트 연결 · Teams / Mem / Drive",
   "agentBuilder.sessionConnectionsIntro": "여기서 접근 범위를 설정한 뒤 대화를 이어가세요. OpenCode가 작업 폴더에 코드를 작성하고 테스트합니다. 연결 설정은 이 작업 공간의 세션들이 함께 사용합니다.",

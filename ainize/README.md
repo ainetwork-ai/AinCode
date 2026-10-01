@@ -259,3 +259,29 @@ Deployment requires updated app assets, gateway and sandbox CLI/AGENTS.md. The p
 preview is not a valid end-to-end test for this flow. Verify real OpenCode question replies, local file writes,
 CLI module import, tests, explicit push, binding and each platform's actual A2A invocation before declaring E2E
 success. A draft being opened does not prove that a model ran or an agent was created.
+
+## Shared organization workspaces
+
+Open `/code/_workspaces` (also linked inside OpenCode) to choose a personal or organization workspace.
+`/code/org/<org-id>/` has one organization-owned container and persistent home volume: OpenCode's session
+database, working files and Git history are shared. Personal workspace volumes and conversations are not
+copied. Share an organization session's URL with another member to open that same conversation.
+
+Membership comes from authenticated `/api/orgs` on every HTTP request and WebSocket handshake. `read` and
+`contributor` can read; `write` and `admin` can execute and edit. Open streams are rechecked every 15 seconds
+and closed if access is revoked. Read roles cannot open terminal WebSockets or mutate the workspace.
+
+On the organization workspace page a write/admin member explicitly connects their execution account for
+30 minutes. Model usage is billed to that account; simply opening another member's session never replaces
+it. Another member can connect after it expires or is released. Restarting the gateway clears these leases.
+The gateway checks the execution account's current membership before every outbound operation. Credentials
+stay outside the sandbox. The shared CLI sees only that organization's agents, cannot delete agents or
+change them to private/public/another organization, and scaffolds new agents with the organization scope.
+
+Platform connections configured in this workspace are shared deliberately with the organization and stored
+separately from personal connections. Existing personal grants are never copied. Connecting an account and
+saving resource selections still requires explicit consent in the connections panel.
+
+This is a shared working tree, not per-member branches or a merge/conflict UI. Concurrent sessions can edit
+the same files. Persistent volumes protect against container replacement, not host/disk loss: this change
+does not configure GitHub synchronization or off-host backups.

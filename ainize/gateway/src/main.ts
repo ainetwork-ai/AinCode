@@ -10,6 +10,7 @@ import { mkdirSync } from "node:fs"
 import { loadConfig } from "./config.ts"
 import { Egress, Sessions } from "./egress.ts"
 import { IdentityResolver } from "./identity.ts"
+import { WorkspaceExecutors } from "./workspaces.ts"
 import { KeyStore } from "./keys.ts"
 import { PublicProxy } from "./public.ts"
 import { Sandboxes } from "./sandboxes.ts"
@@ -17,13 +18,14 @@ import { Sandboxes } from "./sandboxes.ts"
 const cfg = loadConfig()
 mkdirSync(cfg.stateDir, { recursive: true, mode: 0o700 })
 
+const executors = new WorkspaceExecutors()
 const sessions = new Sessions()
 const keys = new KeyStore(cfg.stateDir, cfg.ainize, cfg.keyLabel)
 let egress: Egress
 const boxes = new Sandboxes(cfg, (sb) => egress.listen(sb))
-egress = new Egress(cfg, keys, sessions, (sb) => boxes.touch(sb))
+egress = new Egress(cfg, keys, sessions, (sb) => boxes.touch(sb), fetch, executors)
 const ids = new IdentityResolver(cfg.ainize)
-const proxy = new PublicProxy(cfg, ids, boxes, sessions)
+const proxy = new PublicProxy(cfg, ids, boxes, sessions, executors)
 
 await boxes.boot()
 const server = proxy.server()

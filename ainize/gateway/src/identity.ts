@@ -10,6 +10,8 @@ import { createHash } from "node:crypto"
 export const AINIZE_COOKIES = ["ainize_session", "ainize_google_session"]
 
 export interface Identity {
+  /** Set only by the gateway after checking the caller's organization membership. */
+  workspaceOrg?: string
   /** Authentication evidence is separate from the stable (possibly legacy-linked) principal. */
   authType?: "sso" | "wallet" | "google"
   /** Stable name of the person: `sso:<sub>`, `google:<sub>` or a lower-case wallet address. */

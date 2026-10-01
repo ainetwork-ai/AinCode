@@ -10,6 +10,11 @@ export function SessionBuilderPanel() {
   onMount(() => sessionStorage.removeItem("aincode-builder-open-connections"))
   return <Show when={basePath().startsWith("/code")}>
     <section class="border-b border-border-base px-4 py-2 shrink-0">
+      <a class="mr-4 underline" href={`${basePath().split("/org/")[0]}/_workspaces`}>{language.t("agentBuilder.workspaces")}</a>
+      <Show when={basePath().includes("/org/")}>
+        <a class="mr-4 underline" href={`${basePath()}/_workspace`}>{language.t("agentBuilder.orgWorkspace")}</a>
+        <p class="text-text-weak text-12 mb-2">{language.t("agentBuilder.orgSharedNotice")}</p>
+      </Show>
       <button type="button" aria-expanded={state.open} onClick={() => setState("open", !state.open)}>
         {language.t("agentBuilder.sessionConnections")}
       </button>

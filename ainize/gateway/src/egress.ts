@@ -15,6 +15,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { Readable } from "node:stream"
 import type { GatewayConfig } from "./config.ts"
 import { KeyStore, SessionMissing } from "./keys.ts"
+import type { Identity } from "./identity.ts"
+import { agentInOrg, canWrite, organizations, workspaceBase, workspaceOrg, WorkspaceExecutors } from "./workspaces.ts"
 import type { Sandbox } from "./sandboxes.ts"
 
 const LLM_MAX_BODY = 48 * 1024 * 1024
@@ -96,11 +98,13 @@ export class Egress {
   private readonly cfg: GatewayConfig
   private readonly keys: KeyStore
   private readonly sessions: Sessions
+  private readonly executors: WorkspaceExecutors
   private readonly fetchImpl: typeof fetch
   private servers = new Map<string, Server>()
   private readonly onActivity: (sb: Sandbox) => void
 
-  constructor(cfg: GatewayConfig, keys: KeyStore, sessions: Sessions, onActivity: (sb: Sandbox) => void, fetchImpl: typeof fetch = fetch) {
+  constructor(cfg: GatewayConfig, keys: KeyStore, sessions: Sessions, onActivity: (sb: Sandbox) => void, fetchImpl: typeof fetch = fetch, executors = new WorkspaceExecutors()) {
+    this.executors = executors
     this.cfg = cfg
     this.keys = keys
     this.sessions = sessions
@@ -139,17 +143,27 @@ export class Egress {
   private async handle(sb: Sandbox, req: IncomingMessage, res: ServerResponse) {
     const url = new URL(req.url ?? "/", "http://sandbox")
     const method = (req.method ?? "GET").toUpperCase()
-    if (url.pathname === "/v1/chat/completions" && method === "POST") return this.chat(sb, req, res)
     if (url.pathname === "/v1/models" && method === "GET") return this.models(res)
+    const org = workspaceOrg(sb.principal)
+    const actor = org ? this.executors.get(org) : undefined
+    if (org) {
+      if (!actor) return send(res, 401, { error: "Connect an execution account from the organization workspace page" })
+      const member = (await organizations(this.cfg.ainize, actor.cookie, this.fetchImpl)).find(item => item.id === org)
+      if (!member || !canWrite(member)) {
+        this.executors.release(org, actor.principal)
+        return send(res, 403, { error: "organization execution membership revoked" })
+      }
+    }
+    if (url.pathname === "/v1/chat/completions" && method === "POST") return this.chat(sb, req, res, actor)
     const builderPath = url.pathname === "/api/builder/connections" && method === "GET"
       ? "/connections"
       : /^\/api\/builder\/agents\/[a-z0-9-]{1,40}\/connect$/.test(url.pathname) && method === "POST"
         ? "/workspace" + url.pathname.slice("/api/builder".length) : undefined
     if (builderPath) {
-      const cookie = this.sessions.get(sb.principal)
+      const cookie = actor?.cookie ?? this.sessions.get(sb.principal)
       if (!cookie) throw new SessionMissing()
       const body = method === "POST" ? await readBody(req, 24_000) : undefined
-      const upstream = await this.fetchImpl(`http://${this.cfg.host}:${this.cfg.port}${this.cfg.basePath}/_builder${builderPath}`, {
+      const upstream = await this.fetchImpl(`http://${this.cfg.host}:${this.cfg.port}${workspaceBase(this.cfg.basePath, sb.principal)}/_builder${builderPath}`, {
         method, headers: { cookie, origin: `http://${this.cfg.host}:${this.cfg.port}`, "content-type": "application/json" },
         body: body as BodyInit | undefined, signal: abortOnClose(res), redirect: "error",
       })
@@ -157,7 +171,7 @@ export class Egress {
     }
     if (url.pathname.startsWith("/api/")) {
       if (!apiAllowed(method, url.pathname)) return send(res, 403, { error: `${method} ${url.pathname} is not available from a workspace` })
-      return this.api(sb, req, res, method, url)
+      return this.api(sb, req, res, method, url, actor)
     }
     send(res, 404, { error: "not found" })
   }
@@ -166,7 +180,7 @@ export class Egress {
     send(res, 200, { object: "list", data: this.cfg.models.map((id) => ({ id, object: "model", owned_by: "ainize" })) })
   }
 
-  private async chat(sb: Sandbox, req: IncomingMessage, res: ServerResponse) {
+  private async chat(sb: Sandbox, req: IncomingMessage, res: ServerResponse, actor?: Identity) {
     let body: any
     try {
       body = JSON.parse((await readBody(req, LLM_MAX_BODY)).toString("utf8"))
@@ -182,7 +196,7 @@ export class Egress {
     body.model = model
     const payload = JSON.stringify(body)
     for (let attempt = 0; attempt < 2; attempt++) {
-      const key = await this.keys.get(sb.principal, this.sessions.get(sb.principal))
+      const key = await this.keys.get(actor?.principal ?? sb.principal, actor?.cookie ?? this.sessions.get(sb.principal))
       const upstream = await this.fetchImpl(this.cfg.ainize + "/v1/chat/completions", {
         method: "POST",
         headers: { authorization: `Bearer ${key}`, "content-type": "application/json", accept: req.headers.accept ?? "*/*" },
@@ -192,18 +206,59 @@ export class Egress {
       if (upstream.status === 401 && attempt === 0) {
         // The key was revoked; make another with the person's session and try once more.
         await upstream.body?.cancel()
-        this.keys.drop(sb.principal, key)
+        this.keys.drop(actor?.principal ?? sb.principal, key)
         continue
       }
       return relay(res, upstream)
     }
   }
 
-  private async api(sb: Sandbox, req: IncomingMessage, res: ServerResponse, method: string, url: URL) {
-    const cookie = this.sessions.get(sb.principal)
+  /** A shared shell must never inherit the executor's personal or other-organization agent access. */
+  private async orgApi(org: string, cookie: string, method: string, url: URL, body: Buffer | undefined, res: ServerResponse) {
+    const headers = { cookie, accept: "application/json", "content-type": "application/json" }
+    const upstream = (path: string, verb = "GET", payload?: Buffer) => this.fetchImpl(this.cfg.ainize + path, {
+      method: verb, headers, body: payload as BodyInit | undefined, redirect: "error", signal: abortOnClose(res),
+    })
+    if (method === "GET" && url.pathname === "/api/auth/me") return send(res, 200, {
+      signedIn: true, subject: `workspace-org:${org}`, workspaceOrg: org,
+      sso: { principal: `workspace-org:${org}`, orgs: [{ id: org }] },
+    })
+    if (method === "GET" && url.pathname === "/api/orgs") {
+      return send(res, 200, { orgs: (await organizations(this.cfg.ainize, cookie, this.fetchImpl)).filter(item => item.id === org) })
+    }
+    if (method === "GET" && url.pathname === "/api/models") return relay(res, await upstream(url.pathname))
+    if (url.pathname === "/api/hosted-agents" && method === "GET") {
+      const response = await upstream("/api/hosted-agents?manageable=1")
+      if (!response.ok) return send(res, response.status, { error: "organization_agents_unavailable" })
+      const value = await response.json() as { agents?: unknown[] }
+      return send(res, 200, { agents: (value.agents ?? []).filter(agent => agentInOrg(agent, org)) })
+    }
+    const match = url.pathname.match(/^\/api\/hosted-agents\/([a-z0-9-]{1,40})(\/(logs|secrets\/[A-Z][A-Z0-9_]{0,63}))?$/)
+    if (match) {
+      // Fetch the full spec, not a list row. The origin still checks permissions on the eventual operation.
+      const response = await upstream(`/api/hosted-agents/${match[1]}`)
+      const value = await response.json().catch(() => ({})) as { agent?: unknown }
+      if (!response.ok) return send(res, response.status === 404 ? 404 : 403, { error: "organization_agent_unavailable" })
+      if (!agentInOrg(value.agent, org)) return send(res, 403, { error: "agent_outside_workspace" })
+      if (method === "GET" && !match[2]) return send(res, 200, value)
+      if (method === "GET" && match[3] === "logs") return relay(res, await upstream(url.pathname))
+      if (method === "PUT" && match[3]?.startsWith("secrets/")) return relay(res, await upstream(url.pathname, method, body))
+    }
+    if ((url.pathname === "/api/hosted-agents" && method === "POST") || (match && !match[2] && method === "PUT")) {
+      const spec = JSON.parse(body?.toString("utf8") ?? "null")
+      if (!agentInOrg(spec, org)) return send(res, 403, { error: "agents_must_stay_in_workspace_organization" })
+      return relay(res, await upstream(url.pathname, method, body))
+    }
+    return send(res, 403, { error: "operation_not_available_in_shared_workspace" })
+  }
+
+  private async api(sb: Sandbox, req: IncomingMessage, res: ServerResponse, method: string, url: URL, actor?: Identity) {
+    const cookie = actor?.cookie ?? this.sessions.get(sb.principal)
     if (!cookie) throw new SessionMissing()
     const hasBody = !["GET", "HEAD"].includes(method)
     const body = hasBody ? await readBody(req, API_MAX_BODY) : undefined
+    const org = workspaceOrg(sb.principal)
+    if (org) return this.orgApi(org, cookie, method, url, body, res)
     const headers: Record<string, string> = { cookie, accept: "application/json" }
     if (hasBody) headers["content-type"] = String(req.headers["content-type"] ?? "application/json")
     const upstream = await this.fetchImpl(this.cfg.ainize + url.pathname + url.search, {
