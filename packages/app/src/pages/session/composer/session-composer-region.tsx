@@ -1,3 +1,4 @@
+import { BuilderQuestion } from "@/ainize/builder-question"
 import { Show, type JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useSettings } from "@/context/settings"
@@ -39,7 +40,10 @@ export function SessionComposerRegion(props: {
         <Show when={controller.state.questionRequest()} keyed>
           {(request) => (
             <div>
-              <SessionQuestionDock request={request} onSubmit={controller.onResponseSubmit} />
+              <Show when={request.questions.length === 1 && request.questions[0].header.startsWith("AIN Builder")}
+                fallback={<SessionQuestionDock request={request} onSubmit={controller.onResponseSubmit} />}>
+                <BuilderQuestion request={request} onSubmit={controller.onResponseSubmit} />
+              </Show>
             </div>
           )}
         </Show>

@@ -3,10 +3,16 @@
   "private": true,
   "type": "module",
   "description": "ainize.ai/code: one sandboxed AinCode workspace per signed-in ainize user",
-  "engines": { "node": ">=23.6" },
+  "engines": {
+    "node": ">=23.6"
+  },
   "scripts": {
     "start": "node src/main.ts",
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/node": "24.12.2",
+    "typescript": "5.9.3"
   }
 }

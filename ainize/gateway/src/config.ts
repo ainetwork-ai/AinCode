@@ -10,6 +10,10 @@ function num(value: string | undefined, fallback: number): number {
 
 export interface GatewayConfig {
   /** Where nginx reaches the gateway. Never a public interface. */
+  teamsUrl?: string
+  memUrl?: string
+  driveUrl?: string
+  publicUrl?: string
   host: string
   port: number
   /** The URL prefix AinCode is served under; must match OPENCODE_BASE_PATH in the image. */
@@ -43,6 +47,10 @@ export interface GatewayConfig {
 
 export function loadConfig(): GatewayConfig {
   return {
+    teamsUrl: (env.AINCODE_TEAMS_URL ?? "https://ainteams.ainetwork.ai").replace(/\/+$/, ""),
+    memUrl: (env.AINCODE_MEM_URL ?? "https://ainmem.ainetwork.ai").replace(/\/+$/, ""),
+    driveUrl: (env.AINCODE_DRIVE_URL ?? "https://aindrive.ainetwork.ai").replace(/\/+$/, ""),
+    publicUrl: (env.AINCODE_PUBLIC_URL ?? "https://ainize.ai").replace(/\/+$/, ""),
     host: env.AINCODE_GATEWAY_HOST ?? "127.0.0.1",
     port: num(env.AINCODE_GATEWAY_PORT, 3950),
     basePath: (env.AINCODE_BASE_PATH ?? "/code").replace(/\/+$/, ""),

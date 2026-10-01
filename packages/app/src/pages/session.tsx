@@ -1,3 +1,4 @@
+import { SessionBuilderPanel } from "@/ainize/session-builder-panel"
 import type { FilePart, Project, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -2249,6 +2250,7 @@ export default function Page() {
   return (
     <SessionRouteFrame>
       <SessionHeader />
+      <SessionBuilderPanel />
       <div
         ref={panelRow}
         class="flex-1 min-h-0 flex flex-col md:flex-row"

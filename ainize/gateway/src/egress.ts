@@ -141,6 +141,20 @@ export class Egress {
     const method = (req.method ?? "GET").toUpperCase()
     if (url.pathname === "/v1/chat/completions" && method === "POST") return this.chat(sb, req, res)
     if (url.pathname === "/v1/models" && method === "GET") return this.models(res)
+    const builderPath = url.pathname === "/api/builder/connections" && method === "GET"
+      ? "/connections"
+      : /^\/api\/builder\/agents\/[a-z0-9-]{1,40}\/connect$/.test(url.pathname) && method === "POST"
+        ? "/workspace" + url.pathname.slice("/api/builder".length) : undefined
+    if (builderPath) {
+      const cookie = this.sessions.get(sb.principal)
+      if (!cookie) throw new SessionMissing()
+      const body = method === "POST" ? await readBody(req, 24_000) : undefined
+      const upstream = await this.fetchImpl(`http://${this.cfg.host}:${this.cfg.port}${this.cfg.basePath}/_builder${builderPath}`, {
+        method, headers: { cookie, origin: `http://${this.cfg.host}:${this.cfg.port}`, "content-type": "application/json" },
+        body: body as BodyInit | undefined, signal: abortOnClose(res), redirect: "error",
+      })
+      return relay(res, upstream)
+    }
     if (url.pathname.startsWith("/api/")) {
       if (!apiAllowed(method, url.pathname)) return send(res, 403, { error: `${method} ${url.pathname} is not available from a workspace` })
       return this.api(sb, req, res, method, url)

@@ -12,6 +12,7 @@ import type { Duplex } from "node:stream"
 import type { GatewayConfig } from "./config.ts"
 import type { Sessions } from "./egress.ts"
 import { IdentityResolver, withoutAinizeCookies, type Identity } from "./identity.ts"
+import { AgentBuilder } from "./builder.ts"
 import { errorPage, signInPage, startingPage } from "./pages.ts"
 import type { Sandbox, Sandboxes } from "./sandboxes.ts"
 
@@ -61,12 +62,14 @@ function json(res: ServerResponse, status: number, body: unknown) {
 }
 
 export class PublicProxy {
+  private readonly builder: AgentBuilder
   private readonly cfg: GatewayConfig
   private readonly ids: IdentityResolver
   private readonly boxes: Sandboxes
   private readonly sessions: Sessions
 
   constructor(cfg: GatewayConfig, ids: IdentityResolver, boxes: Sandboxes, sessions: Sessions) {
+    this.builder = new AgentBuilder(cfg)
     this.cfg = cfg
     this.ids = ids
     this.boxes = boxes
@@ -110,11 +113,16 @@ export class PublicProxy {
       res.writeHead(302, { location: this.cfg.basePath + "/" + url.slice(this.cfg.basePath.length) })
       return res.end()
     }
+    if (new URL(url, "http://gateway").pathname === this.cfg.basePath + "/_builder/mcp/tool") return this.builder.mcpTool(req, res)
+    if (new URL(url, "http://gateway").pathname === this.cfg.basePath + "/_builder/drive/tool") return this.builder.driveTool(req, res)
     if (!sameOrigin(req)) return json(res, 403, { error: "cross-origin request refused" })
     const id = await this.who(req)
     if (!id) {
-      if (wantsPage(req)) return html(res, 200, signInPage(this.cfg.basePath))
+      if (wantsPage(req)) return html(res, 200, signInPage(this.cfg.basePath, url))
       return json(res, 401, { error: "sign in to ainize first" })
+    }
+    if (url.startsWith(this.cfg.basePath + "/_builder/")) {
+      return this.builder.handle(req, res, id)
     }
     let sb = this.boxes.get(id.principal)
     if (!sb?.running) {

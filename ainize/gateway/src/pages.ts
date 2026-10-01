@@ -18,8 +18,8 @@ border:1px solid var(--line);color:var(--fg)}a.btn.primary{background:var(--acce
 </style></head><body><main class="card">${body}</main></body></html>`
 }
 
-export function signInPage(basePath: string) {
-  const next = encodeURIComponent(basePath + "/")
+export function signInPage(basePath: string, requested = basePath + "/") {
+  const next = encodeURIComponent(requested.startsWith(basePath + "/") ? requested : basePath + "/")
   return page(
     "Sign in",
     `<h1>AinCode</h1>

@@ -69,6 +69,8 @@ import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } fro
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
 
+const AgentBuilderPage = lazy(() => import("@/pages/agent-builder"))
+
 const NewSession = lazy(() => import("@/pages/new-session"))
 
 const SessionRoute = () => {
@@ -640,6 +642,7 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         <Route path="/:dir/session/:id" component={NewLayoutLegacySessionRedirect} />
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
+      <Route path="/builder" component={AgentBuilderPage} />
       <Route path="/new-session" component={DraftRoute} />
     </>
   )
