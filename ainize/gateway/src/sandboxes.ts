@@ -147,9 +147,14 @@ export class Sandboxes {
     await this.makeRoom(sb)
     mkdirSync(sb.runDir, { recursive: true, mode: 0o700 })
     await this.beforeStart(sb)
-    const inspect = await docker(["inspect", "-f", "{{.State.Running}}", sb.name])
+    const inspect = await docker(["inspect", "-f", "{{.State.Running}} {{.Config.Image}}", sb.name])
     if (inspect.code === 0) {
-      if (inspect.stdout.trim() !== "true") await dockerOk(["start", sb.name])
+      const [running, image] = inspect.stdout.trim().split(" ")
+      if (running !== "true" && image !== this.cfg.image) {
+        // Upgrade only a stopped container. Never remove its named home volume or interrupt a live session.
+        await dockerOk(["rm", sb.name])
+        await dockerOk(this.runArgs(sb))
+      } else if (running !== "true") await dockerOk(["start", sb.name])
     } else {
       await dockerOk(this.runArgs(sb))
     }
