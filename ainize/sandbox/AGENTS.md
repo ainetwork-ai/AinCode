@@ -61,3 +61,21 @@ Run these in the terminal or through the shell tool:
 - Show the person what you will change, and push only when they want the change live. A push is a deployment.
 - Commit to git in this workspace before large edits so they can be undone.
 - If a command says the session has ended, tell the person to reload ainize.ai/code.
+
+## Guided building inside OpenCode
+
+Use the question tool to gather concrete behavior for all three platforms in this session. Prefix question
+headers with `AIN Builder`. Ask one question at a time, with useful choices and custom answers. Credentials
+and consent belong in the session’s connections panel, never in chat.
+
+- `ainize-agents connections` reads this workspace owner's saved target and tool selections.
+- `ainize-agents connections <id>` imports connector modules into an existing local tools agent and merges
+  required hosts and secret names. It does not write index.mjs, create credentials or deploy.
+- Write workflow code, prompt and tests yourself. Import drive.mjs as a default export (drive.tools), and
+  mcp.mjs as named tools when present. Preserve these scoped connector modules.
+- After user-requested push, use `ainize-agents connect <id>` to bind saved connections. Check returned status.
+- Do not use the legacy builder create API instead of local development. Distinguish local tests from live
+  MCP calls and actual host-specific A2A verification. Continue development in this same OpenCode session.
+
+## Uncommon Gallery Builder
+When asked to create or edit an AINSpace/A2A Builder agent, use `ainize-agents gallery context`, `new`, `pull`, `validate`, `push`. New agents are always stored in Uncommon Gallery. Edit `agents/<id>/builder.json`; skills and intents remain separate fields, not flattened into the prompt. Preserve existing memories and context history. Manual image upload and authoring are at `/code/gallery`. Memory commands are `gallery status`, `memory`, `evolve`, `update-memory` (JSON file or stdin). Do not invent successful imports of old memories. Test actual A2A replies and report model-related differences.

@@ -10,6 +10,8 @@ import { createHash } from "node:crypto"
 export const AINIZE_COOKIES = ["ainize_session", "ainize_google_session"]
 
 export interface Identity {
+  /** Authentication evidence is separate from the stable (possibly legacy-linked) principal. */
+  authType?: "sso" | "wallet" | "google"
   /** Stable name of the person: `sso:<sub>`, `google:<sub>` or a lower-case wallet address. */
   principal: string
   display: string
@@ -91,13 +93,13 @@ export class IdentityResolver {
     if (cookie.includes("ainize_session=")) {
       const me = (await this.get("/api/auth/me", cookie)) as Me
       if (me.sso?.principal) {
-        return { principal: me.sso.principal, display: me.sso.email || me.sso.name || me.sso.principal, cookie }
+        return { principal: me.sso.principal, display: me.sso.email || me.sso.name || me.sso.principal, cookie, authType: "sso" }
       }
-      if (me.signedIn && me.subject) return { principal: String(me.subject).toLowerCase(), display: String(me.subject), cookie }
+      if (me.signedIn && me.subject) return { principal: String(me.subject).toLowerCase(), display: String(me.subject), cookie, authType: "wallet" }
     }
     if (cookie.includes("ainize_google_session=")) {
       const g = (await this.get("/api/auth/google/session", cookie)) as { identity?: { sub?: string; email?: string } | null }
-      if (g.identity?.sub) return { principal: `google:${g.identity.sub}`, display: g.identity.email || g.identity.sub, cookie }
+      if (g.identity?.sub) return { principal: `google:${g.identity.sub}`, display: g.identity.email || g.identity.sub, cookie, authType: "google" }
     }
     return null
   }

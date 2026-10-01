@@ -12,6 +12,10 @@ import type { Duplex } from "node:stream"
 import type { GatewayConfig } from "./config.ts"
 import type { Sessions } from "./egress.ts"
 import { IdentityResolver, withoutAinizeCookies, type Identity } from "./identity.ts"
+import { GalleryBuilder } from "./gallery.ts"
+import { galleryAiPage } from "./gallery-ai-page.ts"
+import { galleryPage } from "./gallery-page.ts"
+import { AgentBuilder } from "./builder.ts"
 import { errorPage, signInPage, startingPage } from "./pages.ts"
 import type { Sandbox, Sandboxes } from "./sandboxes.ts"
 
@@ -61,12 +65,16 @@ function json(res: ServerResponse, status: number, body: unknown) {
 }
 
 export class PublicProxy {
+  private readonly gallery: GalleryBuilder
+  private readonly builder: AgentBuilder
   private readonly cfg: GatewayConfig
   private readonly ids: IdentityResolver
   private readonly boxes: Sandboxes
   private readonly sessions: Sessions
 
   constructor(cfg: GatewayConfig, ids: IdentityResolver, boxes: Sandboxes, sessions: Sessions) {
+    this.gallery = new GalleryBuilder(cfg)
+    this.builder = new AgentBuilder(cfg)
     this.cfg = cfg
     this.ids = ids
     this.boxes = boxes
@@ -110,11 +118,21 @@ export class PublicProxy {
       res.writeHead(302, { location: this.cfg.basePath + "/" + url.slice(this.cfg.basePath.length) })
       return res.end()
     }
+    if (new URL(url, "http://gateway").pathname === this.cfg.basePath + "/_builder/mcp/tool") return this.builder.mcpTool(req, res)
+    if (new URL(url, "http://gateway").pathname === this.cfg.basePath + "/_builder/drive/tool") return this.builder.driveTool(req, res)
+    if (this.gallery.image(req, res)) return
     if (!sameOrigin(req)) return json(res, 403, { error: "cross-origin request refused" })
     const id = await this.who(req)
     if (!id) {
-      if (wantsPage(req)) return html(res, 200, signInPage(this.cfg.basePath))
+      if (wantsPage(req)) return html(res, 200, signInPage(this.cfg.basePath, url))
       return json(res, 401, { error: "sign in to ainize first" })
+    }
+    const target = new URL(url, "http://gateway")
+    if (req.method === "GET" && target.pathname === this.cfg.basePath + "/" && target.searchParams.get("gallery") === "1" && wantsPage(req)) return html(res, 200, galleryPage(this.cfg.basePath, this.cfg.workspaceDir))
+    if (req.method === "GET" && target.pathname === this.cfg.basePath + "/builder" && target.searchParams.has("gallery")) return html(res, 200, galleryAiPage(this.cfg.basePath, this.cfg.workspaceDir, target.searchParams.get("description") ?? ""))
+    if (req.method === "GET" && new URL(url, "http://gateway").pathname === this.cfg.basePath + "/gallery") return html(res, 200, galleryPage(this.cfg.basePath, this.cfg.workspaceDir))
+    if (url.startsWith(this.cfg.basePath + "/_builder/")) {
+      return this.builder.handle(req, res, id)
     }
     let sb = this.boxes.get(id.principal)
     if (!sb?.running) {
@@ -138,7 +156,7 @@ export class PublicProxy {
     }
     // A bare /code/ page load goes to a new session in the workspace. The app's home only lists projects this
     // browser has opened before, so a first visit would otherwise show an empty page with nothing to start from.
-    if (req.method === "GET" && wantsPage(req) && url === this.cfg.basePath + "/") {
+    if (req.method === "GET" && wantsPage(req) && target.pathname === this.cfg.basePath + "/") {
       res.writeHead(302, { location: workspaceSessionPath(this.cfg.basePath, this.cfg.workspaceDir) })
       return res.end()
     }

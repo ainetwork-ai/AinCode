@@ -22,6 +22,6 @@ fi
 ctx="$(mktemp -d)"
 trap 'rm -rf "$ctx"' EXIT
 cp "$bin" "$ctx/aincode"
-cp "$here"/{Dockerfile,opencode.json,AGENTS.md,entrypoint.mjs,ainize-agents.mjs} "$ctx/"
+cp "$here"/{Dockerfile,opencode.json,AGENTS.md,entrypoint.mjs,ainize-agents.mjs,gallery-cli.mjs} "$ctx/"
 docker build -t "$tag" --label "ainize.aincode.version=$("$bin" --version)" "$ctx"
 echo "built $tag ($("$bin" --version))"

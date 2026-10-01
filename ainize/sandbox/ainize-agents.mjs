@@ -10,6 +10,7 @@
  * It talks to $AINIZE_API (the sandbox gateway). The gateway signs each call as the person using this workspace,
  * and ainize decides what that person may read or change; this tool holds no credentials.
  */
+import { gallery } from "./gallery-cli.mjs"
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 
@@ -143,6 +144,7 @@ export default {
 `
 
 const commands = {
+  async gallery(args) { await gallery(args, api, ROOT) },
   async list() {
     const { scope, agents } = await remoteList()
     const local = existsSync(ROOT) ? readdirSync(ROOT).filter((d) => existsSync(join(ROOT, d, "agent.json"))) : []
@@ -245,6 +247,35 @@ const commands = {
     console.log(`${id}: scaffolded ${mode} agent in ${dirOf(id)} — edit it, then: ainize-agents push ${id}`)
   },
 
+  async connections(args) {
+    const data = await api("GET", "/builder/connections")
+    const id = args[0]
+    if (!id) { console.log(JSON.stringify(data.selection, null, 2)); return }
+    if (!ID.test(id) || !existsSync(join(dirOf(id), "agent.json"))) throw new Error("Create a local tools agent first")
+    const manifest = readJson(join(dirOf(id), "agent.json"))
+    if (manifest.mode !== "tools") throw new Error("Builder connections require tools mode")
+    const files = data.files ?? {}
+    for (const [name, code] of Object.entries(files)) {
+      if (!["drive.mjs", "mcp.mjs"].includes(name) || typeof code !== "string") throw new Error("Invalid connector module")
+      const file = join(dirOf(id), "files", name)
+      if (existsSync(file) && readFileSync(file, "utf8") !== code) throw new Error(`${name} differs: review and move it before importing`)
+    }
+    mkdirSync(join(dirOf(id), "files"), { recursive: true })
+    for (const [name, code] of Object.entries(files)) writeFileSync(join(dirOf(id), "files", name), code)
+    manifest.allowedHosts = [...new Set([...(manifest.allowedHosts ?? []), ...data.allowedHosts])]
+    manifest.secretNames = [...new Set([...(manifest.secretNames ?? []), ...data.secretNames])]
+    writeJson(join(dirOf(id), "agent.json"), manifest)
+    writeJson(join(dirOf(id), "builder-connections.json"), data.selection)
+    console.log(`${id}: imported ${Object.keys(files).join(", ") || "no connectors"}. Write files/index.mjs yourself. Not deployed.`)
+  },
+  async connect(args) {
+    const id = args[0]
+    if (!id || !ID.test(id)) throw new Error("usage: ainize-agents connect <id>")
+    const data = await api("POST", `/builder/agents/${id}/connect`, {})
+    console.log(JSON.stringify(data, null, 2))
+    if (data.agent?.driveStatus === "failed" || data.agent?.mcpStatus === "failed") throw new Error("Connection binding failed; inspect saved permissions before retrying")
+  },
+
   async logs(args) {
     const id = args[0]
     if (!id) throw new Error("usage: ainize-agents logs <id>")
@@ -288,10 +319,13 @@ function isFlagValue(args, a) {
 const [cmd, ...rest] = process.argv.slice(2)
 if (!cmd || !commands[cmd]) {
   console.log(`usage: ainize-agents <command>
+  gallery <command>            Uncommon Gallery Builder: context, list, new, pull, validate, push, status, memory, evolve, update-memory, logs
   list                         agents you can manage, and which are pulled here
   pull <id...> | --all         fetch into ${ROOT}/<id>
   push <id> [--force]          create or update on ainize from the folder
   new <id> [--mode prompt|tools|handler] [--name N] [--org ORG] [--visibility public|org|private|unlisted]
+  connections [id]             inspect saved connections or import scoped tools locally
+  connect <id>                 bind saved connections after pushing
   logs <id>                    recent runtime logs
   secret <id> <NAME>           set a secret from stdin
   rm <id> --yes                delete on ainize
