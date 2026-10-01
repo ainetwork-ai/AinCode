@@ -4,6 +4,7 @@ import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
 import { useTabs } from "@/context/tabs"
 import { basePath } from "@/utils/base-path"
+import { gallerySessionPrompt } from "../../../../ainize/shared/gallery"
 import { builderSessionPrompt } from "../../../../ainize/shared/builder-session"
 
 /** Teams Builder enters the ordinary OpenCode draft; no hosted agent is created here. */
@@ -27,7 +28,8 @@ export default function AgentBuilderPage() {
       const res = await fetch(`${basePath()}/_builder/context`, { credentials: "same-origin" })
       if (!res.ok) throw new Error(res.status === 403 ? "ain_signin_required" : "context_unavailable")
       const context = await res.json()
-      await tabs.newDraft({ server: server.key, directory: context.directory }, builderSessionPrompt())
+      const query = new URLSearchParams(location.search)
+      await tabs.newDraft({ server: server.key, directory: context.directory }, query.has("gallery") ? gallerySessionPrompt(query.get("description") ?? "") : builderSessionPrompt())
     } catch (error) { setState({ error: language.t(error instanceof Error && error.message === "ain_signin_required" ? "agentBuilder.ain_signin_required" : "agentBuilder.context_unavailable"), busy: false }) }
   }
   onMount(start)

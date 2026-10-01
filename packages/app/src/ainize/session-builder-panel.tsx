@@ -10,6 +10,7 @@ export function SessionBuilderPanel() {
   onMount(() => sessionStorage.removeItem("aincode-builder-open-connections"))
   return <Show when={basePath().startsWith("/code")}>
     <section class="border-b border-border-base px-4 py-2 shrink-0">
+      <a class="mr-4" href={basePath() + "/gallery"}>{language.t("agentBuilder.create")} · Uncommon Gallery</a>
       <button type="button" aria-expanded={state.open} onClick={() => setState("open", !state.open)}>
         {language.t("agentBuilder.sessionConnections")}
       </button>

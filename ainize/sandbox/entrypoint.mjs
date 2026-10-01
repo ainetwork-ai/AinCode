@@ -13,7 +13,7 @@
  * Both directions are byte pipes, so HTTP streaming (SSE) and WebSocket upgrades pass through untouched.
  */
 import { spawn, spawnSync } from "node:child_process"
-import { chmodSync, existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs"
+import { copyFileSync, chmodSync, existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs"
 import net from "node:net"
 
 const RUN = process.env.AINCODE_RUN_DIR || "/run/aincode"
@@ -32,6 +32,8 @@ function pipe(a, b) {
 
 function prepareWorkspace() {
   mkdirSync(WORKSPACE, { recursive: true })
+  mkdirSync(`${WORKSPACE}/.ainize-tools`, { recursive: true, mode: 0o700 })
+  for (const name of ["ainize-agents.mjs", "gallery-cli.mjs"]) copyFileSync(`/opt/aincode/${name}`, `${WORKSPACE}/.ainize-tools/${name}`)
   // AinCode snapshots and undo work on git; a workspace that is a repository also gives the person history. It needs
   // one commit: AinCode names a project after its first commit, and without one the workspace is not a project.
   if (!existsSync(`${WORKSPACE}/.git`)) {

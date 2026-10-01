@@ -12,6 +12,9 @@ import type { Duplex } from "node:stream"
 import type { GatewayConfig } from "./config.ts"
 import type { Sessions } from "./egress.ts"
 import { IdentityResolver, withoutAinizeCookies, type Identity } from "./identity.ts"
+import { GalleryBuilder } from "./gallery.ts"
+import { galleryAiPage } from "./gallery-ai-page.ts"
+import { galleryPage } from "./gallery-page.ts"
 import { AgentBuilder } from "./builder.ts"
 import { errorPage, signInPage, startingPage } from "./pages.ts"
 import type { Sandbox, Sandboxes } from "./sandboxes.ts"
@@ -62,6 +65,7 @@ function json(res: ServerResponse, status: number, body: unknown) {
 }
 
 export class PublicProxy {
+  private readonly gallery: GalleryBuilder
   private readonly builder: AgentBuilder
   private readonly cfg: GatewayConfig
   private readonly ids: IdentityResolver
@@ -69,6 +73,7 @@ export class PublicProxy {
   private readonly sessions: Sessions
 
   constructor(cfg: GatewayConfig, ids: IdentityResolver, boxes: Sandboxes, sessions: Sessions) {
+    this.gallery = new GalleryBuilder(cfg)
     this.builder = new AgentBuilder(cfg)
     this.cfg = cfg
     this.ids = ids
@@ -115,12 +120,17 @@ export class PublicProxy {
     }
     if (new URL(url, "http://gateway").pathname === this.cfg.basePath + "/_builder/mcp/tool") return this.builder.mcpTool(req, res)
     if (new URL(url, "http://gateway").pathname === this.cfg.basePath + "/_builder/drive/tool") return this.builder.driveTool(req, res)
+    if (this.gallery.image(req, res)) return
     if (!sameOrigin(req)) return json(res, 403, { error: "cross-origin request refused" })
     const id = await this.who(req)
     if (!id) {
       if (wantsPage(req)) return html(res, 200, signInPage(this.cfg.basePath, url))
       return json(res, 401, { error: "sign in to ainize first" })
     }
+    const target = new URL(url, "http://gateway")
+    if (req.method === "GET" && target.pathname === this.cfg.basePath + "/builder" && target.searchParams.has("gallery")) return html(res, 200, galleryAiPage(this.cfg.basePath, this.cfg.workspaceDir, target.searchParams.get("description") ?? ""))
+    if (req.method === "GET" && url === this.cfg.basePath + "/" && wantsPage(req)) return html(res, 200, galleryPage(this.cfg.basePath, this.cfg.workspaceDir))
+    if (req.method === "GET" && new URL(url, "http://gateway").pathname === this.cfg.basePath + "/gallery") return html(res, 200, galleryPage(this.cfg.basePath, this.cfg.workspaceDir))
     if (url.startsWith(this.cfg.basePath + "/_builder/")) {
       return this.builder.handle(req, res, id)
     }

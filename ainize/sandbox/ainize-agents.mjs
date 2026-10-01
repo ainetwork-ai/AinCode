@@ -10,6 +10,7 @@
  * It talks to $AINIZE_API (the sandbox gateway). The gateway signs each call as the person using this workspace,
  * and ainize decides what that person may read or change; this tool holds no credentials.
  */
+import { gallery } from "./gallery-cli.mjs"
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 
@@ -143,6 +144,7 @@ export default {
 `
 
 const commands = {
+  async gallery(args) { await gallery(args, api, ROOT) },
   async list() {
     const { scope, agents } = await remoteList()
     const local = existsSync(ROOT) ? readdirSync(ROOT).filter((d) => existsSync(join(ROOT, d, "agent.json"))) : []
@@ -317,6 +319,7 @@ function isFlagValue(args, a) {
 const [cmd, ...rest] = process.argv.slice(2)
 if (!cmd || !commands[cmd]) {
   console.log(`usage: ainize-agents <command>
+  gallery <command>            Uncommon Gallery Builder: context, list, new, pull, validate, push, status, memory, evolve, update-memory, logs
   list                         agents you can manage, and which are pulled here
   pull <id...> | --all         fetch into ${ROOT}/<id>
   push <id> [--force]          create or update on ainize from the folder

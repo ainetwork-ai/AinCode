@@ -76,3 +76,6 @@ and consent belong in the session’s connections panel, never in chat.
 - After user-requested push, use `ainize-agents connect <id>` to bind saved connections. Check returned status.
 - Do not use the legacy builder create API instead of local development. Distinguish local tests from live
   MCP calls and actual host-specific A2A verification. Continue development in this same OpenCode session.
+
+## Uncommon Gallery Builder
+When asked to create or edit an AINSpace/A2A Builder agent, use `ainize-agents gallery context`, `new`, `pull`, `validate`, `push`. New agents are always stored in Uncommon Gallery. Edit `agents/<id>/builder.json`; skills and intents remain separate fields, not flattened into the prompt. Preserve existing memories and context history. Manual image upload and authoring are at `/code/gallery`. Memory commands are `gallery status`, `memory`, `evolve`, `update-memory` (JSON file or stdin). Do not invent successful imports of old memories. Test actual A2A replies and report model-related differences.

@@ -259,3 +259,13 @@ Deployment requires updated app assets, gateway and sandbox CLI/AGENTS.md. The p
 preview is not a valid end-to-end test for this flow. Verify real OpenCode question replies, local file writes,
 CLI module import, tests, explicit push, binding and each platform's actual A2A invocation before declaring E2E
 success. A draft being opened does not prove that a model ran or an agent was created.
+
+## Uncommon Gallery / AINSpace Builder
+
+Opening `/code/` now shows the organization Builder. `/code/gallery` provides manual role, skill, situation-rule, image, chat and memory controls; `/code/builder?gallery=1` starts an ordinary scoped AinCode conversation. The existing connector Builder and Code workspace remain available. New Builder agents always publish to `uncommon-gallery`; membership and native owner/write/admin permissions still apply.
+
+Set `AINCODE_GALLERY_MODEL` to the long-context model used by the organization. The gateway routes the workspace's primary model alias to that configured peer, without exposing credentials in the workspace. The native node must support durable per-agent state, Unix gateway transport and the authenticated `POST /api/hosted-agents/:id/builder` management endpoint. Memory enumeration and changes require the agent owner or organization admin.
+
+`ainize-agents gallery help` documents creation, full server-side validation, editing, actual A2A tests, memory operations, logs and removal. For running older workspaces, deploy the two CLI modules into their writable `.ainize-tools` folder; sessions do not need to be stopped. Future workspace images prepare those tools automatically. Do not replace an active workspace just to upgrade this feature.
+
+Configuration edits preserve durable history, learned memory, migration provenance, customized runtime files and existing connector permissions. Long private role descriptions remain complete while the public listing uses its normal 500-character summary. Historical private memories from the old service are not claimed imported unless its provenance flag confirms this.

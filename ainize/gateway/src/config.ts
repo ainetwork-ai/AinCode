@@ -10,6 +10,7 @@ function num(value: string | undefined, fallback: number): number {
 
 export interface GatewayConfig {
   /** Where nginx reaches the gateway. Never a public interface. */
+  galleryModel?: string
   teamsUrl?: string
   memUrl?: string
   driveUrl?: string
@@ -47,6 +48,7 @@ export interface GatewayConfig {
 
 export function loadConfig(): GatewayConfig {
   return {
+    galleryModel: env.AINCODE_GALLERY_MODEL,
     teamsUrl: (env.AINCODE_TEAMS_URL ?? "https://ainteams.ainetwork.ai").replace(/\/+$/, ""),
     memUrl: (env.AINCODE_MEM_URL ?? "https://ainmem.ainetwork.ai").replace(/\/+$/, ""),
     driveUrl: (env.AINCODE_DRIVE_URL ?? "https://aindrive.ainetwork.ai").replace(/\/+$/, ""),

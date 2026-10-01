@@ -1,3 +1,4 @@
+import { GalleryBuilder } from "./gallery.ts"
 import { createHash, randomUUID } from "node:crypto"
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from "node:fs"
 import { join } from "node:path"
@@ -21,6 +22,8 @@ function record(value: unknown): Record<string, unknown> {
 export class AgentBuilder {
   private cfg: GatewayConfig
   private fetchImpl: typeof fetch
+  private galleryBuilder?: GalleryBuilder
+  private get gallery() { return this.galleryBuilder ??= new GalleryBuilder(this.cfg, this.fetchImpl) }
   private connections?: BuilderMcp
   private get mcp() { return this.connections ??= new BuilderMcp(this.cfg, this.fetchImpl) }
   private connection?: BuilderDrive
@@ -64,6 +67,7 @@ export class AgentBuilder {
   async handle(req: IncomingMessage, res: ServerResponse, id: Identity) {
     const path = new URL(req.url ?? "/", "http://gateway").pathname.slice((this.cfg.basePath + "/_builder").length)
     if (id.principal.startsWith("google:") && id.authType !== "sso") return json(res, 403, { error: "ain_signin_required" })
+    if (path.startsWith("/gallery/")) return this.gallery.handle(req, res, id, path.slice("/gallery".length))
     if (path === "/connections" || /^\/workspace\/agents\/[a-z0-9-]{1,40}\/connect$/.test(path)) {
       return this.workspaceConnections(req, res, id, path)
     }

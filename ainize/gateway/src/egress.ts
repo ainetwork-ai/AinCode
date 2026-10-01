@@ -141,14 +141,15 @@ export class Egress {
     const method = (req.method ?? "GET").toUpperCase()
     if (url.pathname === "/v1/chat/completions" && method === "POST") return this.chat(sb, req, res)
     if (url.pathname === "/v1/models" && method === "GET") return this.models(res)
-    const builderPath = url.pathname === "/api/builder/connections" && method === "GET"
+    const galleryPath = /^\/api\/gallery\/(context|validate|agents(?:\/[a-z0-9][a-z0-9-]{0,39}(?:\/(memory|logs|test))?)?|images)$/.test(url.pathname) ? "/gallery" + url.pathname.slice("/api/gallery".length) : undefined
+    const builderPath = galleryPath ?? (url.pathname === "/api/builder/connections" && method === "GET"
       ? "/connections"
       : /^\/api\/builder\/agents\/[a-z0-9-]{1,40}\/connect$/.test(url.pathname) && method === "POST"
-        ? "/workspace" + url.pathname.slice("/api/builder".length) : undefined
+        ? "/workspace" + url.pathname.slice("/api/builder".length) : undefined)
     if (builderPath) {
       const cookie = this.sessions.get(sb.principal)
       if (!cookie) throw new SessionMissing()
-      const body = method === "POST" ? await readBody(req, 24_000) : undefined
+      const body = !["GET", "HEAD"].includes(method) ? await readBody(req, galleryPath ? 6_000_000 : 24_000) : undefined
       const upstream = await this.fetchImpl(`http://${this.cfg.host}:${this.cfg.port}${this.cfg.basePath}/_builder${builderPath}`, {
         method, headers: { cookie, origin: `http://${this.cfg.host}:${this.cfg.port}`, "content-type": "application/json" },
         body: body as BodyInit | undefined, signal: abortOnClose(res), redirect: "error",
@@ -179,7 +180,8 @@ export class Egress {
     if (!this.cfg.models.includes(model)) {
       return openaiError(res, 403, "model_not_allowed", `this workspace may use ${this.cfg.models.join(", ")}, not ${body.model}`)
     }
-    body.model = model
+    // Keep the workspace model name stable while routing its large prompts to the configured long-context peer.
+    body.model = model === this.cfg.models[0] && this.cfg.galleryModel ? this.cfg.galleryModel : model
     const payload = JSON.stringify(body)
     for (let attempt = 0; attempt < 2; attempt++) {
       const key = await this.keys.get(sb.principal, this.sessions.get(sb.principal))
