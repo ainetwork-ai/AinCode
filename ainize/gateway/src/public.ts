@@ -128,8 +128,8 @@ export class PublicProxy {
       return json(res, 401, { error: "sign in to ainize first" })
     }
     const target = new URL(url, "http://gateway")
+    if (req.method === "GET" && target.pathname === this.cfg.basePath + "/" && target.searchParams.get("gallery") === "1" && wantsPage(req)) return html(res, 200, galleryPage(this.cfg.basePath, this.cfg.workspaceDir))
     if (req.method === "GET" && target.pathname === this.cfg.basePath + "/builder" && target.searchParams.has("gallery")) return html(res, 200, galleryAiPage(this.cfg.basePath, this.cfg.workspaceDir, target.searchParams.get("description") ?? ""))
-    if (req.method === "GET" && url === this.cfg.basePath + "/" && wantsPage(req)) return html(res, 200, galleryPage(this.cfg.basePath, this.cfg.workspaceDir))
     if (req.method === "GET" && new URL(url, "http://gateway").pathname === this.cfg.basePath + "/gallery") return html(res, 200, galleryPage(this.cfg.basePath, this.cfg.workspaceDir))
     if (url.startsWith(this.cfg.basePath + "/_builder/")) {
       return this.builder.handle(req, res, id)
@@ -156,7 +156,7 @@ export class PublicProxy {
     }
     // A bare /code/ page load goes to a new session in the workspace. The app's home only lists projects this
     // browser has opened before, so a first visit would otherwise show an empty page with nothing to start from.
-    if (req.method === "GET" && wantsPage(req) && url === this.cfg.basePath + "/") {
+    if (req.method === "GET" && wantsPage(req) && target.pathname === this.cfg.basePath + "/") {
       res.writeHead(302, { location: workspaceSessionPath(this.cfg.basePath, this.cfg.workspaceDir) })
       return res.end()
     }

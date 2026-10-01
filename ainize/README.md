@@ -262,7 +262,7 @@ success. A draft being opened does not prove that a model ran or an agent was cr
 
 ## Uncommon Gallery / AINSpace Builder
 
-Opening `/code/` now shows the organization Builder. `/code/gallery` provides manual role, skill, situation-rule, image, chat and memory controls; `/code/builder?gallery=1` starts an ordinary scoped AinCode conversation. The existing connector Builder and Code workspace remain available. New Builder agents always publish to `uncommon-gallery`; membership and native owner/write/admin permissions still apply.
+Opening `/code/` retains the general AinCode workspace and its existing agent creation workflows. The Uncommon Gallery Builder is an optional workflow selected with `/code?gallery=1`. `/code/gallery` provides manual role, skill, situation-rule, image, chat and memory controls; `/code/builder?gallery=1` starts an ordinary scoped AinCode conversation. The existing connector Builder and Code workspace remain available. New Builder agents always publish to `uncommon-gallery`; membership and native owner/write/admin permissions still apply.
 
 Set `AINCODE_GALLERY_MODEL` to the long-context model used by the organization. The gateway routes the workspace's primary model alias to that configured peer, without exposing credentials in the workspace. The native node must support durable per-agent state, Unix gateway transport and the authenticated `POST /api/hosted-agents/:id/builder` management endpoint. Memory enumeration and changes require the agent owner or organization admin.
 
