@@ -1,4 +1,4 @@
-import { onMount, Show } from "solid-js"
+import { onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
@@ -10,6 +10,8 @@ import { builderSessionPrompt } from "../../../../ainize/shared/builder-session"
 export default function AgentBuilderPage() {
   const language = useLanguage(), server = useServer(), tabs = useTabs()
   const [state, setState] = createStore({ error: "", busy: false })
+  const controller = new AbortController()
+  onCleanup(() => controller.abort())
   async function start() {
     if (state.busy) return
     setState({ busy: true, error: "" })
@@ -24,9 +26,14 @@ export default function AgentBuilderPage() {
         }
       }
       if (new URLSearchParams(location.search).has("approvals")) sessionStorage.setItem("aincode-builder-open-connections", "1")
-      const res = await fetch(`${basePath()}/_builder/context`, { credentials: "same-origin" })
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)])
+      const res = await fetch(`${basePath()}/_builder/context`, { credentials: "same-origin", signal })
       if (!res.ok) throw new Error(res.status === 403 ? "ain_signin_required" : "context_unavailable")
       const context = await res.json()
+      if (typeof context.directory !== "string" || !context.directory) throw new Error("context_unavailable")
+      // Restore existing tabs before inserting a draft, so hydration cannot replace it.
+      await tabs.ready.promise
+      if (controller.signal.aborted) return
       await tabs.newDraft({ server: server.key, directory: context.directory }, builderSessionPrompt())
     } catch (error) { setState({ error: language.t(error instanceof Error && error.message === "ain_signin_required" ? "agentBuilder.ain_signin_required" : "agentBuilder.context_unavailable"), busy: false }) }
   }
