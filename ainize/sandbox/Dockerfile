@@ -17,6 +17,7 @@ RUN usermod -l aincode -d /home/aincode -m node && groupmod -n aincode node
 COPY aincode /usr/local/bin/aincode
 COPY opencode.json /opt/aincode/opencode.json
 COPY AGENTS.md /opt/aincode/AGENTS.md
+COPY skills /opt/aincode/skills
 COPY entrypoint.mjs /opt/aincode/entrypoint.mjs
 COPY ainize-agents.mjs /opt/aincode/ainize-agents.mjs
 RUN ln -s /opt/aincode/ainize-agents.mjs /usr/local/bin/ainize-agents && chmod 755 /opt/aincode/*.mjs

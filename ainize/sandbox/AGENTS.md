@@ -64,18 +64,9 @@ Run these in the terminal or through the shell tool:
 
 ## Guided building inside OpenCode
 
-Use the question tool to gather concrete behavior for all three platforms in this session. Prefix question
-headers with `AIN Builder`. Ask one question at a time, with useful choices and custom answers. Credentials
-and consent belong in the session’s connections panel, never in chat.
-
-- `ainize-agents connections` reads this workspace owner's saved target and tool selections.
-- `ainize-agents connections <id>` imports connector modules into an existing local tools agent and merges
-  required hosts and secret names. It does not write index.mjs, create credentials or deploy.
-- Write workflow code, prompt and tests yourself. Import drive.mjs as a default export (drive.tools), and
-  mcp.mjs as named tools when present. Preserve these scoped connector modules.
-- After user-requested push, use `ainize-agents connect <id>` to bind saved connections. Check returned status.
-- Do not use the legacy builder create API instead of local development. Distinguish local tests from live
-  MCP calls and actual host-specific A2A verification. Continue development in this same OpenCode session.
+For guided agent creation or updates across AIN Teams, AIN Mem and AIN Drive, load the
+`ain-agent-builder` skill with the skill tool before asking questions or writing code.
+The skill contains the platform questions, connection workflow and verification requirements.
 
 ## Organization workspaces
 

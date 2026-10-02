@@ -3,10 +3,14 @@
   "share": "disabled",
   "lsp": false,
   "formatter": false,
-  "enabled_providers": ["ainize"],
+  "enabled_providers": [
+    "ainize"
+  ],
   "model": "ainize/Qwen3.8-Flash-Next",
   "small_model": "ainize/Qwen3.8-Flash-Next",
-  "instructions": ["/opt/aincode/AGENTS.md"],
+  "instructions": [
+    "/opt/aincode/AGENTS.md"
+  ],
   "provider": {
     "ainize": {
       "name": "Ainize",
@@ -20,9 +24,17 @@
           "name": "Qwen3.8 Flash Next",
           "tool_call": true,
           "reasoning": true,
-          "limit": { "context": 262144, "output": 32768 }
+          "limit": {
+            "context": 262144,
+            "output": 32768
+          }
         }
       }
     }
+  },
+  "skills": {
+    "paths": [
+      "/opt/aincode/skills"
+    ]
   }
 }
